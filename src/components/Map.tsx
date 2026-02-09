@@ -26,6 +26,17 @@ interface ProtectedArea {
   };
 }
 
+interface Observation {
+  id: string;
+  description: string;
+  image_url: string;
+  species_name: string;
+  coordinates: {
+    type: string;
+    coordinates: [number, number];
+  };
+}
+
 interface MapProps {
   center?: [number, number];
   zoom?: number;
@@ -33,19 +44,20 @@ interface MapProps {
 
 export default function Map({ center = [8.6195, 1.1915], zoom = 7 }: MapProps) {
   const [areas, setAreas] = useState<ProtectedArea[]>([]);
+  const [observations, setObservations] = useState<Observation[]>([]);
   const supabase = createClient();
 
   useEffect(() => {
-    async function fetchAreas() {
-      const { data, error } = await supabase.rpc('get_protected_areas_geojson');
-      
-      if (!error && data) {
-        setAreas(data);
-      } else if (error) {
-        console.error("Erreur lors du chargement des zones:", error.message);
-      }
+    async function fetchData() {
+      // Chargement des zones protégées
+      const { data: areaData } = await supabase.rpc('get_protected_areas_geojson');
+      if (areaData) setAreas(areaData);
+
+      // Chargement des observations vérifiées
+      const { data: obsData } = await supabase.rpc('get_verified_observations_geojson');
+      if (obsData) setObservations(obsData);
     }
-    fetchAreas();
+    fetchData();
   }, []);
 
   // Fonction pour convertir les coordonnées GeoJSON (Lng, Lat) en Leaflet (Lat, Lng)
@@ -82,6 +94,23 @@ export default function Map({ center = [8.6195, 1.1915], zoom = 7 }: MapProps) {
               <div className="text-xs text-stone-500 uppercase">Aire Protégée</div>
             </Popup>
           </Polygon>
+        ))}
+
+        {observations.map((obs) => (
+          <Marker 
+            key={obs.id} 
+            position={[obs.coordinates.coordinates[1], obs.coordinates.coordinates[0]]}
+          >
+            <Popup className="custom-popup">
+              <div className="w-48">
+                {obs.image_url && (
+                  <img src={obs.image_url} className="w-full h-32 object-cover rounded-lg mb-2" alt="Observation" />
+                )}
+                <div className="font-bold text-green-700">{obs.species_name || "Observation citoyenne"}</div>
+                <p className="text-xs text-stone-600 mt-1 line-clamp-2">{obs.description}</p>
+              </div>
+            </Popup>
+          </Marker>
         ))}
 
         <Marker position={[6.1319, 1.2228]}>

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Shield, Plus, Upload, Loader2, CheckCircle, AlertCircle, Trash2, Leaf, Film } from 'lucide-react';
+import { Shield, Plus, Upload, Loader2, CheckCircle, AlertCircle, Trash2, Leaf, Film, Camera } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function AdminPage() {
@@ -29,7 +29,8 @@ export default function AdminPage() {
   });
   const [speciesList, setSpeciesList] = useState<any[]>([]);
   const [docList, setDocList] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'species' | 'docs'>('species');
+  const [obsList, setObsList] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'species' | 'docs' | 'obs'>('species');
 
   const router = useRouter();
   const supabase = createClient();
@@ -46,6 +47,13 @@ export default function AdminPage() {
       .select('*')
       .order('created_at', { ascending: false });
     if (docs) setDocList(docs);
+
+    const { data: obs } = await supabase
+      .from('observations')
+      .select('*, species:species_id(name), profiles:user_id(full_name)')
+      .eq('is_verified', false)
+      .order('created_at', { ascending: false });
+    if (obs) setObsList(obs);
   };
 
   useEffect(() => {
@@ -83,6 +91,30 @@ export default function AdminPage() {
     if (!confirm("Supprimer ce documentaire ?")) return;
     const { error } = await supabase.from('documentaries').delete().eq('id', id);
     if (!error) fetchData();
+  };
+
+  const handleVerifyObs = async (id: string) => {
+    setLoading(true);
+    const { error } = await supabase
+      .from('observations')
+      .update({ is_verified: true })
+      .eq('id', id);
+    if (!error) {
+      setStatus({ type: 'success', msg: "Signalement validé et ajouté à la carte !" });
+      fetchData();
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteObs = async (id: string) => {
+    if (!confirm("Rejeter et supprimer ce signalement ?")) return;
+    setLoading(true);
+    const { error } = await supabase.from('observations').delete().eq('id', id);
+    if (!error) {
+      setStatus({ type: 'success', msg: "Signalement supprimé." });
+      fetchData();
+    }
+    setLoading(false);
   };
 
   const handleSubmitSpecies = async (e: React.FormEvent) => {
@@ -198,6 +230,12 @@ export default function AdminPage() {
         >
           Documentaires
         </button>
+        <button 
+          onClick={() => setActiveTab('obs')}
+          className={`px-6 py-2 rounded-xl font-bold transition-all ${activeTab === 'obs' ? 'bg-green-600 text-white shadow-lg' : 'bg-white text-stone-600 border border-stone-200'}`}
+        >
+          Signalements {obsList.length > 0 && <span className="ml-2 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">{obsList.length}</span>}
+        </button>
       </div>
 
       {activeTab === 'species' ? (
@@ -292,13 +330,13 @@ export default function AdminPage() {
             </div>
           </div>
         </>
-      ) : (
+      ) : activeTab === 'docs' ? (
         <>
           <div className="bg-white rounded-3xl shadow-xl border border-stone-100 p-8">
             <h2 className="text-xl font-bold text-stone-900 mb-8 flex items-center">
               <Plus className="h-5 w-5 mr-2 text-green-600" /> Ajouter un documentaire
             </h2>
-
+            {/* ... reste du formulaire doc ... */}
             <form onSubmit={handleSubmitDoc} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
@@ -383,6 +421,56 @@ export default function AdminPage() {
             </div>
           </div>
         </>
+      ) : (
+        <div className="space-y-6">
+          <h2 className="text-xl font-bold text-stone-900 mb-6 flex items-center">
+            <Camera className="h-5 w-5 mr-2 text-green-600" /> Signalements en attente de validation
+          </h2>
+          
+          <div className="grid grid-cols-1 gap-6">
+            {obsList.map((o) => (
+              <div key={o.id} className="bg-white rounded-3xl border border-stone-100 shadow-sm overflow-hidden flex flex-col md:flex-row">
+                <div className="w-full md:w-64 h-48 md:h-auto">
+                  <img src={o.image_url} className="w-full h-full object-cover" alt="Signalement" />
+                </div>
+                <div className="p-6 flex-1 flex flex-col justify-between">
+                  <div>
+                    <div className="flex justify-between items-start mb-2">
+                      <h3 className="font-bold text-lg text-stone-900">
+                        {o.species?.name || "Espèce inconnue"}
+                      </h3>
+                      <span className="text-[10px] bg-stone-100 px-2 py-1 rounded-full font-bold text-stone-500">
+                        PAR: {o.profiles?.full_name || "Utilisateur"}
+                      </span>
+                    </div>
+                    <p className="text-stone-600 text-sm mb-4">{o.description}</p>
+                  </div>
+                  
+                  <div className="flex space-x-3">
+                    <button 
+                      onClick={() => handleVerifyObs(o.id)}
+                      className="flex-1 bg-green-600 text-white font-bold py-2 rounded-xl hover:bg-green-700 transition-all flex items-center justify-center"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" /> Valider
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteObs(o.id)}
+                      className="flex-1 bg-white text-red-600 border border-red-100 font-bold py-2 rounded-xl hover:bg-red-50 transition-all flex items-center justify-center"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" /> Rejeter
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            
+            {obsList.length === 0 && (
+              <div className="text-center py-24 bg-stone-50 rounded-3xl border border-dashed border-stone-200">
+                <p className="text-stone-500 font-medium">Aucun signalement en attente. Beau travail !</p>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
