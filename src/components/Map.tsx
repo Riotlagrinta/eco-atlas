@@ -20,7 +20,7 @@ interface MapProps {
   zoom?: number;
 }
 
-export default function Map({ center = [20, 0], zoom = 2 }: MapProps) {
+export default function Map({ center = [8.6195, 1.1915], zoom = 7 }: MapProps) {
   return (
     <div className="h-full w-full rounded-2xl overflow-hidden shadow-inner border border-stone-200">
       <MapContainer

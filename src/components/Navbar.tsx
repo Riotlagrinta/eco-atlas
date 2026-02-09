@@ -40,6 +40,12 @@ export function Navbar() {
                 <span>{item.name}</span>
               </Link>
             ))}
+            <Link
+              href="/connexion"
+              className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-full font-bold text-sm transition-all shadow-md hover:shadow-green-500/20"
+            >
+              Connexion
+            </Link>
           </div>
 
           {/* Mobile menu button */}

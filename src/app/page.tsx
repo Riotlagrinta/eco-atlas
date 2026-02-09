@@ -16,11 +16,10 @@ export default function Home() {
         </div>
         <div className="relative z-10 max-w-7xl mx-auto px-4 text-center text-white">
           <h1 className="text-5xl md:text-7xl font-bold mb-6 tracking-tight">
-            Explorez la <span className="text-green-400">Nature</span>,<br />
-            Protégez l'Avenir.
+            Explorez la Nature <br /><span className="text-green-400">du Togo</span>.
           </h1>
           <p className="text-xl md:text-2xl mb-10 max-w-2xl mx-auto text-stone-200">
-            Eco-Atlas est votre observatoire interactif de la biodiversité. Suivez les espèces en danger et découvrez la beauté de notre planète.
+            Eco-Atlas est l'observatoire citoyen de la biodiversité togolaise. De la savane de Dapaong aux forêts d'Agou, protégeons notre patrimoine.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
