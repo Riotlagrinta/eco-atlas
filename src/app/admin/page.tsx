@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Shield, Plus, Upload, Loader2, CheckCircle, AlertCircle, Trash2, Leaf } from 'lucide-react';
+import { Shield, Plus, Upload, Loader2, CheckCircle, AlertCircle, Trash2, Leaf, Film } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function AdminPage() {
@@ -19,18 +19,33 @@ export default function AdminPage() {
     conservation_status: 'LC',
     image_url: ''
   });
+  const [docData, setDocData] = useState({
+    title: '',
+    description: '',
+    video_url: '',
+    thumbnail_url: '',
+    duration: '',
+    category: 'Nature'
+  });
   const [speciesList, setSpeciesList] = useState<any[]>([]);
+  const [docList, setDocList] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'species' | 'docs'>('species');
 
   const router = useRouter();
   const supabase = createClient();
 
-  const fetchSpecies = async () => {
-    const { data, error } = await supabase
+  const fetchData = async () => {
+    const { data: species } = await supabase
       .from('species')
       .select('*')
       .order('created_at', { ascending: false });
-    
-    if (data) setSpeciesList(data);
+    if (species) setSpeciesList(species);
+
+    const { data: docs } = await supabase
+      .from('documentaries')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (docs) setDocList(docs);
   };
 
   useEffect(() => {
@@ -51,27 +66,45 @@ export default function AdminPage() {
         router.push('/');
       } else {
         setIsAdmin(true);
-        fetchSpecies();
+        fetchData();
       }
       setLoading(false);
     }
     checkAdmin();
   }, [router, supabase]);
 
-  const handleDelete = async (id: string) => {
-    if (!confirm("Voulez-vous vraiment supprimer cette espèce du patrimoine ?")) return;
+  const handleDeleteSpecies = async (id: string) => {
+    if (!confirm("Supprimer cette espèce ?")) return;
+    const { error } = await supabase.from('species').delete().eq('id', id);
+    if (!error) fetchData();
+  };
 
+  const handleDeleteDoc = async (id: string) => {
+    if (!confirm("Supprimer ce documentaire ?")) return;
+    const { error } = await supabase.from('documentaries').delete().eq('id', id);
+    if (!error) fetchData();
+  };
+
+  const handleSubmitSpecies = async (e: React.FormEvent) => {
+    e.preventDefault();
     setLoading(true);
-    const { error } = await supabase
-      .from('species')
-      .delete()
-      .eq('id', id);
+    const { error } = await supabase.from('species').insert([formData]);
+    if (!error) {
+      setStatus({ type: 'success', msg: "Espèce ajoutée !" });
+      setFormData({ name: '', scientific_name: '', description: '', conservation_status: 'LC', image_url: '' });
+      fetchData();
+    }
+    setLoading(false);
+  };
 
-    if (error) {
-      setStatus({ type: 'error', msg: "Erreur lors de la suppression : " + error.message });
-    } else {
-      setStatus({ type: 'success', msg: "Espèce supprimée avec succès." });
-      fetchSpecies();
+  const handleSubmitDoc = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    const { error } = await supabase.from('documentaries').insert([docData]);
+    if (!error) {
+      setStatus({ type: 'success', msg: "Documentaire ajouté !" });
+      setDocData({ title: '', description: '', video_url: '', thumbnail_url: '', duration: '', category: 'Nature' });
+      fetchData();
     }
     setLoading(false);
   };
@@ -116,7 +149,7 @@ export default function AdminPage() {
     } else {
       setStatus({ type: 'success', msg: "Espèce ajoutée avec succès au patrimoine togolais !" });
       setFormData({ name: '', scientific_name: '', description: '', conservation_status: 'LC', image_url: '' });
-      fetchSpecies();
+      fetchData();
     }
     setLoading(false);
   };
@@ -152,136 +185,205 @@ export default function AdminPage() {
         </motion.div>
       )}
 
-      <div className="bg-white rounded-3xl shadow-xl border border-stone-100 p-8">
-        <h2 className="text-xl font-bold text-stone-900 mb-8 flex items-center">
-          <Plus className="h-5 w-5 mr-2 text-green-600" /> Ajouter une nouvelle espèce
-        </h2>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-bold text-stone-700 mb-2">Nom commun</label>
-              <input
-                type="text"
-                required
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none transition-all"
-                placeholder="Ex: Éléphant du Nord"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-bold text-stone-700 mb-2">Nom scientifique</label>
-              <input
-                type="text"
-                value={formData.scientific_name}
-                onChange={(e) => setFormData({ ...formData, scientific_name: e.target.value })}
-                className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none transition-all"
-                placeholder="Ex: Loxodonta africana"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold text-stone-700 mb-2">Description locale</label>
-            <textarea
-              required
-              rows={4}
-              value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none transition-all resize-none"
-              placeholder="Décrivez l'importance de cette espèce pour le Togo..."
-            ></textarea>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
-            <div>
-              <label className="block text-sm font-bold text-stone-700 mb-2">Statut de conservation</label>
-              <select
-                value={formData.conservation_status}
-                onChange={(e) => setFormData({ ...formData, conservation_status: e.target.value })}
-                className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none transition-all"
-              >
-                <option value="LC">Préoccupation mineure (LC)</option>
-                <option value="NT">Quasi menacé (NT)</option>
-                <option value="VU">Vulnérable (VU)</option>
-                <option value="EN">En danger (EN)</option>
-                <option value="CR">Danger critique (CR)</option>
-                <option value="EW">Éteint à l'état sauvage (EW)</option>
-                <option value="EX">Éteint (EX)</option>
-              </select>
-            </div>
-
-            <div className="relative">
-              <input
-                type="file"
-                id="file-upload"
-                className="hidden"
-                accept="image/*"
-                onChange={handleFileUpload}
-              />
-              <label
-                htmlFor="file-upload"
-                className={`flex items-center justify-center w-full px-4 py-3 rounded-xl border-2 border-dashed transition-all cursor-pointer ${formData.image_url ? 'border-green-500 bg-green-50 text-green-700' : 'border-stone-200 hover:border-green-400 text-stone-500'}`}
-              >
-                {uploading ? (
-                  <Loader2 className="h-5 w-5 animate-spin mr-2" />
-                ) : formData.image_url ? (
-                  <CheckCircle className="h-5 w-5 mr-2" />
-                ) : (
-                  <Upload className="h-5 w-5 mr-2" />
-                )}
-                {formData.image_url ? 'Photo chargée' : 'Charger une photo'}
-              </label>
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading || uploading}
-            className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-green-600/20 transition-all flex items-center justify-center disabled:opacity-50"
-          >
-            {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : "Enregistrer l'espèce"}
-          </button>
-        </form>
+      <div className="flex space-x-4 mb-8">
+        <button 
+          onClick={() => setActiveTab('species')}
+          className={`px-6 py-2 rounded-xl font-bold transition-all ${activeTab === 'species' ? 'bg-green-600 text-white shadow-lg' : 'bg-white text-stone-600 border border-stone-200'}`}
+        >
+          Espèces
+        </button>
+        <button 
+          onClick={() => setActiveTab('docs')}
+          className={`px-6 py-2 rounded-xl font-bold transition-all ${activeTab === 'docs' ? 'bg-green-600 text-white shadow-lg' : 'bg-white text-stone-600 border border-stone-200'}`}
+        >
+          Documentaires
+        </button>
       </div>
 
-      {/* Liste des espèces existantes */}
-      <div className="mt-12">
-        <h2 className="text-xl font-bold text-stone-900 mb-6 flex items-center">
-          <Leaf className="h-5 w-5 mr-2 text-green-600" /> Espèces enregistrées
-        </h2>
-        
-        <div className="grid grid-cols-1 gap-4">
-          {speciesList.map((s) => (
-            <div key={s.id} className="bg-white p-4 rounded-2xl border border-stone-100 shadow-sm flex items-center justify-between group hover:shadow-md transition-all">
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 rounded-xl overflow-hidden bg-stone-100">
-                  <img src={s.image_url} alt={s.name} className="w-full h-full object-cover" />
+      {activeTab === 'species' ? (
+        <>
+          <div className="bg-white rounded-3xl shadow-xl border border-stone-100 p-8">
+            <h2 className="text-xl font-bold text-stone-900 mb-8 flex items-center">
+              <Plus className="h-5 w-5 mr-2 text-green-600" /> Ajouter une nouvelle espèce
+            </h2>
+
+            <form onSubmit={handleSubmitSpecies} className="space-y-6">
+              {/* Formulaire espèce existant */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-bold text-stone-700 mb-2">Nom commun</label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none transition-all"
+                  />
                 </div>
                 <div>
-                  <h3 className="font-bold text-stone-900">{s.name}</h3>
-                  <p className="text-xs text-stone-500 italic">{s.scientific_name}</p>
+                  <label className="block text-sm font-bold text-stone-700 mb-2">Nom scientifique</label>
+                  <input
+                    type="text"
+                    value={formData.scientific_name}
+                    onChange={(e) => setFormData({ ...formData, scientific_name: e.target.value })}
+                    className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none transition-all"
+                  />
                 </div>
               </div>
-              
-              <button 
-                onClick={() => handleDelete(s.id)}
-                className="p-2 text-stone-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
-                title="Supprimer"
-              >
-                <Trash2 className="h-5 w-5" />
-              </button>
-            </div>
-          ))}
 
-          {speciesList.length === 0 && (
-            <div className="text-center py-12 bg-stone-50 rounded-3xl border border-dashed border-stone-200 text-stone-500">
-              Aucune espèce enregistrée pour le moment.
+              <div>
+                <label className="block text-sm font-bold text-stone-700 mb-2">Description locale</label>
+                <textarea
+                  required
+                  rows={4}
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none transition-all resize-none"
+                ></textarea>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                <div>
+                  <label className="block text-sm font-bold text-stone-700 mb-2">Statut de conservation</label>
+                  <select
+                    value={formData.conservation_status}
+                    onChange={(e) => setFormData({ ...formData, conservation_status: e.target.value })}
+                    className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none transition-all"
+                  >
+                    <option value="LC">Préoccupation mineure (LC)</option>
+                    <option value="NT">Quasi menacé (NT)</option>
+                    <option value="VU">Vulnérable (VU)</option>
+                    <option value="EN">En danger (EN)</option>
+                    <option value="CR">Danger critique (CR)</option>
+                  </select>
+                </div>
+
+                <div className="relative">
+                  <input type="file" id="file-upload" className="hidden" accept="image/*" onChange={handleFileUpload} />
+                  <label htmlFor="file-upload" className={`flex items-center justify-center w-full px-4 py-3 rounded-xl border-2 border-dashed transition-all cursor-pointer ${formData.image_url ? 'border-green-500 bg-green-50 text-green-700' : 'border-stone-200 text-stone-500'}`}>
+                    {uploading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <Upload className="h-5 w-5 mr-2" />}
+                    {formData.image_url ? 'Photo chargée' : 'Charger une photo'}
+                  </label>
+                </div>
+              </div>
+
+              <button type="submit" disabled={loading || uploading} className="w-full bg-green-600 text-white font-bold py-4 rounded-xl shadow-lg">
+                Enregistrer l'espèce
+              </button>
+            </form>
+          </div>
+
+          <div className="mt-12">
+            <h2 className="text-xl font-bold text-stone-900 mb-6 flex items-center">
+              <Leaf className="h-5 w-5 mr-2 text-green-600" /> Espèces enregistrées
+            </h2>
+            <div className="grid grid-cols-1 gap-4">
+              {speciesList.map((s) => (
+                <div key={s.id} className="bg-white p-4 rounded-2xl border border-stone-100 flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <img src={s.image_url} className="w-12 h-12 rounded-xl object-cover" />
+                    <h3 className="font-bold">{s.name}</h3>
+                  </div>
+                  <button onClick={() => handleDeleteSpecies(s.id)} className="p-2 text-stone-300 hover:text-red-600">
+                    <Trash2 className="h-5 w-5" />
+                  </button>
+                </div>
+              ))}
             </div>
-          )}
-        </div>
-      </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="bg-white rounded-3xl shadow-xl border border-stone-100 p-8">
+            <h2 className="text-xl font-bold text-stone-900 mb-8 flex items-center">
+              <Plus className="h-5 w-5 mr-2 text-green-600" /> Ajouter un documentaire
+            </h2>
+
+            <form onSubmit={handleSubmitDoc} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-bold text-stone-700 mb-2">Titre du film</label>
+                  <input
+                    type="text"
+                    required
+                    value={docData.title}
+                    onChange={(e) => setDocData({ ...docData, title: e.target.value })}
+                    className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-stone-700 mb-2">Durée (ex: 12:45)</label>
+                  <input
+                    type="text"
+                    required
+                    value={docData.duration}
+                    onChange={(e) => setDocData({ ...docData, duration: e.target.value })}
+                    className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-bold text-stone-700 mb-2">Lien YouTube (Embed)</label>
+                  <input
+                    type="text"
+                    required
+                    value={docData.video_url}
+                    onChange={(e) => setDocData({ ...docData, video_url: e.target.value })}
+                    className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="https://www.youtube.com/embed/..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-bold text-stone-700 mb-2">Image de couverture (URL)</label>
+                  <input
+                    type="text"
+                    required
+                    value={docData.thumbnail_url}
+                    onChange={(e) => setDocData({ ...docData, thumbnail_url: e.target.value })}
+                    className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-stone-700 mb-2">Description</label>
+                <textarea
+                  required
+                  rows={3}
+                  value={docData.description}
+                  onChange={(e) => setDocData({ ...docData, description: e.target.value })}
+                  className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl outline-none focus:ring-2 focus:ring-green-500 resize-none"
+                ></textarea>
+              </div>
+
+              <button type="submit" disabled={loading} className="w-full bg-stone-900 text-white font-bold py-4 rounded-xl shadow-lg">
+                Publier le documentaire
+              </button>
+            </form>
+          </div>
+
+          <div className="mt-12">
+            <h2 className="text-xl font-bold text-stone-900 mb-6 flex items-center">
+              <Film className="h-5 w-5 mr-2 text-green-600" /> Vidéos publiées
+            </h2>
+            <div className="grid grid-cols-1 gap-4">
+              {docList.map((d) => (
+                <div key={d.id} className="bg-white p-4 rounded-2xl border border-stone-100 flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <img src={d.thumbnail_url} className="w-16 h-10 rounded-lg object-cover" />
+                    <h3 className="font-bold">{d.title}</h3>
+                  </div>
+                  <button onClick={() => handleDeleteDoc(d.id)} className="p-2 text-stone-300 hover:text-red-600">
+                    <Trash2 className="h-5 w-5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
