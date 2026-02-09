@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Shield, Plus, Upload, Loader2, CheckCircle, AlertCircle, Trash2 } from 'lucide-react';
+import { Shield, Plus, Upload, Loader2, CheckCircle, AlertCircle, Trash2, Leaf } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function AdminPage() {
@@ -19,9 +19,19 @@ export default function AdminPage() {
     conservation_status: 'LC',
     image_url: ''
   });
+  const [speciesList, setSpeciesList] = useState<any[]>([]);
 
   const router = useRouter();
   const supabase = createClient();
+
+  const fetchSpecies = async () => {
+    const { data, error } = await supabase
+      .from('species')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (data) setSpeciesList(data);
+  };
 
   useEffect(() => {
     async function checkAdmin() {
@@ -41,11 +51,30 @@ export default function AdminPage() {
         router.push('/');
       } else {
         setIsAdmin(true);
+        fetchSpecies();
       }
       setLoading(false);
     }
     checkAdmin();
   }, [router, supabase]);
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Voulez-vous vraiment supprimer cette espèce du patrimoine ?")) return;
+
+    setLoading(true);
+    const { error } = await supabase
+      .from('species')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      setStatus({ type: 'error', msg: "Erreur lors de la suppression : " + error.message });
+    } else {
+      setStatus({ type: 'success', msg: "Espèce supprimée avec succès." });
+      fetchSpecies();
+    }
+    setLoading(false);
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -87,6 +116,7 @@ export default function AdminPage() {
     } else {
       setStatus({ type: 'success', msg: "Espèce ajoutée avec succès au patrimoine togolais !" });
       setFormData({ name: '', scientific_name: '', description: '', conservation_status: 'LC', image_url: '' });
+      fetchSpecies();
     }
     setLoading(false);
   };
@@ -214,6 +244,43 @@ export default function AdminPage() {
             {loading ? <Loader2 className="h-6 w-6 animate-spin" /> : "Enregistrer l'espèce"}
           </button>
         </form>
+      </div>
+
+      {/* Liste des espèces existantes */}
+      <div className="mt-12">
+        <h2 className="text-xl font-bold text-stone-900 mb-6 flex items-center">
+          <Leaf className="h-5 w-5 mr-2 text-green-600" /> Espèces enregistrées
+        </h2>
+        
+        <div className="grid grid-cols-1 gap-4">
+          {speciesList.map((s) => (
+            <div key={s.id} className="bg-white p-4 rounded-2xl border border-stone-100 shadow-sm flex items-center justify-between group hover:shadow-md transition-all">
+              <div className="flex items-center space-x-4">
+                <div className="w-12 h-12 rounded-xl overflow-hidden bg-stone-100">
+                  <img src={s.image_url} alt={s.name} className="w-full h-full object-cover" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-stone-900">{s.name}</h3>
+                  <p className="text-xs text-stone-500 italic">{s.scientific_name}</p>
+                </div>
+              </div>
+              
+              <button 
+                onClick={() => handleDelete(s.id)}
+                className="p-2 text-stone-300 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                title="Supprimer"
+              >
+                <Trash2 className="h-5 w-5" />
+              </button>
+            </div>
+          ))}
+
+          {speciesList.length === 0 && (
+            <div className="text-center py-12 bg-stone-50 rounded-3xl border border-dashed border-stone-200 text-stone-500">
+              Aucune espèce enregistrée pour le moment.
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
