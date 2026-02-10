@@ -4,6 +4,12 @@ import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { Leaf, Search, AlertTriangle, Loader2, X, Share2, Heart, MessageSquare, Send, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import dynamic from 'next/dynamic';
+
+const MiniMap = dynamic(() => import('@/components/Map'), { 
+  ssr: false, 
+  loading: () => <div className="h-full bg-stone-100 animate-pulse" /> 
+});
 
 interface Species {
   id: string;
@@ -147,6 +153,17 @@ export default function ObservatoirePage() {
                   </div>
 
                   <p className="text-stone-600 leading-relaxed whitespace-pre-wrap mb-12 border-b border-stone-100 pb-12">{selectedSpecies.description}</p>
+
+                  {/* Carte de Répartition */}
+                  <div className="mb-12">
+                    <h3 className="text-xl font-bold text-stone-900 mb-6 flex items-center">
+                      <MapPin className="h-5 w-5 mr-2 text-green-600" /> Répartition au Togo
+                    </h3>
+                    <div className="h-64 rounded-3xl overflow-hidden border border-stone-200 shadow-inner">
+                      <MiniMap filter="species" />
+                    </div>
+                    <p className="text-[10px] text-stone-400 mt-2 italic text-center">Les points indiquent les signalements citoyens vérifiés pour cette espèce.</p>
+                  </div>
 
                   {/* Section Discussion */}
                   <div className="bg-stone-50 p-8 rounded-3xl">

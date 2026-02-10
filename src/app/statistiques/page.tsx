@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { BarChart3, PieChart, Activity, ShieldCheck, Leaf, Users, Loader2, ArrowUpRight } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as ChartTooltip, Cell, PieChart as RePieChart, Pie } from 'recharts';
 
 export default function StatistiquesPage() {
   const [loading, setLoading] = useState(true);
@@ -12,7 +13,7 @@ export default function StatistiquesPage() {
     protectedCount: 0,
     obsCount: 0,
     userCount: 0,
-    byStatus: { CR: 0, EN: 0, VU: 0, LC: 0, NT: 0 }
+    byStatus: [] as any[]
   });
 
   const supabase = createClient();
@@ -33,19 +34,25 @@ export default function StatistiquesPage() {
         supabase.from('species').select('conservation_status')
       ]);
 
-      const statusMap: any = { CR: 0, EN: 0, VU: 0, LC: 0, NT: 0 };
+      const statusCount: any = { CR: 0, EN: 0, VU: 0, NT: 0, LC: 0 };
       speciesData?.forEach((s: any) => {
-        if (statusMap[s.conservation_status] !== undefined) {
-          statusMap[s.conservation_status]++;
-        }
+        if (statusCount[s.conservation_status] !== undefined) statusCount[s.conservation_status]++;
       });
+
+      const chartData = [
+        { name: 'Critique', count: statusCount.CR, color: '#dc2626' },
+        { name: 'En danger', count: statusCount.EN, color: '#ea580c' },
+        { name: 'Vulnérable', count: statusCount.VU, color: '#eab308' },
+        { name: 'Quasi menacé', count: statusCount.NT, color: '#3b82f6' },
+        { name: 'Préoccupation mineure', count: statusCount.LC, color: '#22c55e' },
+      ];
 
       setStats({
         speciesCount: sCount || 0,
         protectedCount: pCount || 0,
         obsCount: oCount || 0,
         userCount: uCount || 0,
-        byStatus: statusMap
+        byStatus: chartData
       });
       setLoading(false);
     }
@@ -89,37 +96,29 @@ export default function StatistiquesPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* État de conservation */}
-        <div className="lg:col-span-2 bg-stone-50 rounded-3xl p-8 border border-stone-100">
+        <div className="lg:col-span-2 bg-stone-50 rounded-3xl p-8 border border-stone-100 min-h-[400px]">
           <h3 className="text-xl font-bold text-stone-900 mb-8 flex items-center">
-            <PieChart className="h-5 w-5 mr-2 text-green-600" /> Répartition par Statut UICN
+            <PieChart className="h-5 w-5 mr-2 text-green-600" /> État de la Biodiversité
           </h3>
-          <div className="space-y-6">
-            {[
-              { id: 'CR', label: 'En danger critique', color: 'bg-red-600' },
-              { id: 'EN', label: 'En danger', color: 'bg-orange-500' },
-              { id: 'VU', label: 'Vulnérable', color: 'bg-yellow-500' },
-              { id: 'NT', label: 'Quasi menacé', color: 'bg-blue-500' },
-              { id: 'LC', label: 'Préoccupation mineure', color: 'bg-green-500' }
-            ].map((status) => {
-              const count = (stats.byStatus as any)[status.id] || 0;
-              const percentage = stats.speciesCount > 0 ? (count / stats.speciesCount) * 100 : 0;
-              return (
-                <div key={status.id}>
-                  <div className="flex justify-between mb-2 items-end">
-                    <span className="text-sm font-bold text-stone-700">{status.label}</span>
-                    <span className="text-xs font-bold text-stone-400">{count} espèces ({Math.round(percentage)}%)</span>
-                  </div>
-                  <div className="w-full h-3 bg-stone-200 rounded-full overflow-hidden">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${percentage}%` }}
-                      className={`h-full ${status.color}`}
-                    ></motion.div>
-                  </div>
-                </div>
-              );
-            })}
+          
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={stats.byStatus}>
+                <XAxis dataKey="name" fontSize={10} tickLine={false} axisLine={false} />
+                <YAxis fontSize={10} tickLine={false} axisLine={false} />
+                <ChartTooltip 
+                  contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                />
+                <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                  {stats.byStatus.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
+          
+          <p className="mt-6 text-xs text-stone-400 text-center font-medium uppercase tracking-widest">Répartition selon les critères de l'UICN au Togo</p>
         </div>
 
         {/* Rapports récents */}
