@@ -1,6 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { ArrowRight, Leaf, Map, Shield, PlayCircle } from 'lucide-react';
+import { WeatherWidget } from '@/components/WeatherWidget';
 
 export default function Home() {
   return (
@@ -44,7 +45,13 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Reste des sections (Features, CTA) qui étaient déjà claires */}
+      {/* Weather Section */}
+      <section className="py-12 -mt-16 relative z-20 max-w-7xl mx-auto px-4 w-full">
+        <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-6 ml-4">Météo des Parcs en Temps Réel</h3>
+        <WeatherWidget />
+      </section>
+
+      {/* Reste des sections (Features, CTA) */}
       <section className="py-24 bg-white">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-20">

@@ -3,55 +3,68 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { User, Camera, CheckCircle, Clock, Award, Loader2, ArrowRight, MapPin } from 'lucide-react';
+import { User, Camera, CheckCircle, Clock, Award, Loader2, ArrowRight, MapPin, Settings, Upload, Save, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function ProfilPage() {
   const [loading, setLoading] = useState(true);
+  const [updating, setUploading] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [observations, setObservations] = useState<any[]>([]);
   const [badges, setBadges] = useState<any[]>([]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [newName, setNewName] = useState('');
+  
   const router = useRouter();
   const supabase = createClient();
 
-  useEffect(() => {
-    async function fetchData() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push('/connexion');
-        return;
-      }
-
-      // Fetch Profile
-      const { data: profileData } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-      
-      setProfile(profileData);
-
-      // Fetch User's Observations
-      const { data: obsData } = await supabase
-        .from('observations')
-        .select('*, species:species_id(name)')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-      
-      if (obsData) setObservations(obsData);
-
-      // Fetch User's Badges
-      const { data: badgeData } = await supabase
-        .from('user_badges')
-        .select('*, badges(*)')
-        .eq('user_id', user.id);
-      
-      if (badgeData) setBadges(badgeData);
-
-      setLoading(false);
+  const fetchData = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      router.push('/connexion');
+      return;
     }
+
+    const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    setProfile(profileData);
+    setNewName(profileData?.full_name || '');
+
+    const { data: obsData } = await supabase.from('observations').select('*, species:species_id(name)').eq('user_id', user.id).order('created_at', { ascending: false });
+    if (obsData) setObservations(obsData);
+
+    const { data: badgeData } = await supabase.from('user_badges').select('*, badges(*)').eq('user_id', user.id);
+    if (badgeData) setBadges(badgeData);
+
+    setLoading(false);
+  };
+
+  useEffect(() => {
     fetchData();
   }, [router, supabase]);
+
+  const handleUpdateProfile = async () => {
+    setUpdating(true);
+    const { error } = await supabase.from('profiles').update({ full_name: newName }).eq('id', profile.id);
+    if (!error) {
+      setIsEditing(false);
+      fetchData();
+    }
+    setUpdating(false);
+  };
+
+  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUpdating(true);
+    const filePath = `avatars/${profile.id}-${Math.random()}.${file.name.split('.').pop()}`;
+    const { error: uploadError } = await supabase.storage.from('observations').upload(filePath, file);
+    if (!uploadError) {
+      const { data: { publicUrl } } = supabase.storage.from('observations').getPublicUrl(filePath);
+      await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', profile.id);
+      fetchData();
+    }
+    setUpdating(false);
+  };
 
   const verifiedCount = observations.filter(o => o.is_verified).length;
   const rank = verifiedCount >= 10 ? 'Expert de la Nature' : verifiedCount >= 3 ? 'Sentinelle' : 'Éco-citoyen';
@@ -65,7 +78,7 @@ export default function ProfilPage() {
         <div className="h-32 bg-gradient-to-r from-green-600 to-emerald-500"></div>
         <div className="px-8 pb-8">
           <div className="relative flex flex-col md:flex-row md:items-end -mt-12 mb-6 gap-6">
-            <div className="w-32 h-32 bg-white rounded-3xl p-1 shadow-xl">
+            <div className="w-32 h-32 bg-white rounded-3xl p-1 shadow-xl relative group">
               <div className="w-full h-full bg-stone-100 rounded-2xl flex items-center justify-center overflow-hidden">
                 {profile?.avatar_url ? (
                   <img src={profile.avatar_url} className="w-full h-full object-cover" alt="Avatar" />
@@ -73,9 +86,35 @@ export default function ProfilPage() {
                   <User className="h-12 w-12 text-stone-300" />
                 )}
               </div>
+              <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-2xl">
+                <Upload className="text-white h-6 w-6" />
+                <input type="file" className="hidden" onChange={handleAvatarUpload} accept="image/*" />
+              </label>
             </div>
             <div className="flex-1">
-              <h1 className="text-3xl font-bold text-stone-900">{profile?.full_name || "Éco-citoyen"}</h1>
+              {isEditing ? (
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="text" 
+                    value={newName} 
+                    onChange={(e) => setNewName(e.target.value)}
+                    className="text-2xl font-bold text-stone-900 border-b-2 border-green-500 bg-transparent outline-none py-1"
+                  />
+                  <button onClick={handleUpdateProfile} disabled={updating} className="p-2 text-green-600 hover:bg-green-50 rounded-full transition-all">
+                    {updating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+                  </button>
+                  <button onClick={() => setIsEditing(false)} className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-all">
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <h1 className="text-3xl font-bold text-stone-900">{profile?.full_name || "Éco-citoyen"}</h1>
+                  <button onClick={() => setIsEditing(true)} className="p-2 text-stone-400 hover:text-green-600 transition-all">
+                    <Settings className="h-5 w-5" />
+                  </button>
+                </div>
+              )}
               <p className="text-stone-500 flex items-center mt-1">
                 <Award className="h-4 w-4 mr-2 text-green-600" /> {rank} du Togo
               </p>
