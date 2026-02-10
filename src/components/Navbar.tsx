@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, X, Leaf, Map, Film, Info, Camera, Shield, User, Newspaper, Bell, Clock, Globe } from 'lucide-react';
+import { Menu, X, Leaf, Map, Film, Info, Camera, Shield, User, Newspaper, Bell, Clock, Globe, Target } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { translations } from '@/lib/i18n';
+import { GlobalSearch } from '@/components/GlobalSearch';
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -21,6 +22,7 @@ export function Navbar() {
   const navItems = [
     { name: t.obs, href: '/observatoire', icon: Leaf },
     { name: t.map, href: '/carte', icon: Map },
+    { name: 'Missions', href: '/missions', icon: Target },
     { name: 'Eco-Stream', href: '/documentaires', icon: Film },
     { name: 'Actualités', href: '/actualites', icon: Newspaper },
   ];
@@ -100,6 +102,8 @@ export function Navbar() {
               <button onClick={() => setLang('ee')} className={`text-[9px] px-2 py-1 rounded font-bold ${lang === 'ee' ? 'bg-white text-green-600 shadow-sm' : 'text-stone-400'}`}>EE</button>
               <button onClick={() => setLang('kby')} className={`text-[9px] px-2 py-1 rounded font-bold ${lang === 'kby' ? 'bg-white text-green-600 shadow-sm' : 'text-stone-400'}`}>KBY</button>
             </div>
+
+            <GlobalSearch />
 
             {user && (
               <div className="relative">
