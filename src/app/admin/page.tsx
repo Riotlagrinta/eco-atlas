@@ -4,9 +4,10 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { Shield, Plus, Upload, Loader2, CheckCircle, AlertCircle, Trash2, Leaf, Film, Camera, Map as MapIcon, Newspaper, Save, Users, Target, Brain, QrCode } from 'lucide-react';
+import { Shield, Plus, Upload, Loader2, CheckCircle, AlertCircle, Trash2, Leaf, Film, Camera, Map as MapIcon, Newspaper, Save, Users, Target, Brain, QrCode, BarChart3, Activity } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts';
 
 export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
@@ -17,14 +18,14 @@ export default function AdminPage() {
   
   const [formData, setFormData] = useState({ name: '', scientific_name: '', description: '', conservation_status: 'LC', image_url: '', habitat: '', diet: '', population_estimate: '' });
   const [docData, setDocData] = useState({ title: '', description: '', video_url: '', thumbnail_url: '', duration: '', category: 'Nature' });
-  const [articleData, setArticleData] = useState({ title: '', content: '', image_url: '', category: 'Actualité' });
 
   const [speciesList, setSpeciesList] = useState<any[]>([]);
   const [docList, setDocList] = useState<any[]>([]);
   const [obsList, setObsList] = useState<any[]>([]);
+  const [allObsList, setAllObsList] = useState<any[]>([]);
   const [userList, setUserList] = useState<any[]>([]);
-  const [articleList, setArticleList] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'species' | 'docs' | 'obs' | 'users' | 'blog'>('species');
+  const [adminStats, setAdminStats] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState<'species' | 'docs' | 'obs' | 'users' | 'insights'>('species');
 
   const router = useRouter();
   const supabase = createClient();
@@ -36,14 +37,25 @@ export default function AdminPage() {
     const { data: docs } = await supabase.from('documentaries').select('*').order('created_at', { ascending: false });
     if (docs) setDocList(docs);
 
-    const { data: obs } = await supabase.from('observations').select('*, species:species_id(name), profiles:user_id(full_name)').eq('is_verified', false).order('created_at', { ascending: false });
-    if (obs) setObsList(obs);
+    const { data: obs } = await supabase.from('observations').select('*, species:species_id(name), profiles:user_id(full_name, region)').order('created_at', { ascending: false });
+    if (obs) {
+      setAllObsList(obs);
+      setObsList(obs.filter((o: any) => !o.is_verified));
+      
+      const regionData: any = {};
+      obs.forEach((o: any) => {
+        const reg = o.profiles?.region || 'Inconnue';
+        regionData[reg] = (regionData[reg] || 0) + 1;
+      });
+      setAdminStats({
+        byRegion: Object.keys(regionData).map(k => ({ name: k, count: regionData[k] })),
+        totalAlerts: obs.filter((o: any) => o.type === 'alert').length,
+        resolvedAlerts: obs.filter((o: any) => o.is_resolved).length
+      });
+    }
 
     const { data: users } = await supabase.from('profiles').select('*').order('updated_at', { ascending: false });
     if (users) setUserList(users);
-
-    const { data: arts } = await supabase.from('articles').select('*').order('created_at', { ascending: false });
-    if (arts) setArticleList(arts);
   };
 
   useEffect(() => {
@@ -73,60 +85,23 @@ export default function AdminPage() {
     }
   };
 
-  const handleSubmitSpecies = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    const { error } = await supabase.from('species').insert([formData]);
-    if (!error) {
-      setStatus({ type: 'success', msg: "Espèce ajoutée !" });
-      setFormData({ name: '', scientific_name: '', description: '', conservation_status: 'LC', image_url: '', habitat: '', diet: '', population_estimate: '' });
-      fetchData();
-    }
-    setLoading(false);
+  const handleToggleResolve = async (id: string, current: boolean) => {
+    await supabase.from('observations').update({ is_resolved: !current }).eq('id', id);
+    fetchData();
   };
 
   const handleVerifyObs = async (id: string) => {
     setLoading(true);
-    const { error } = await supabase.from('observations').update({ is_verified: true }).eq('id', id);
-    if (!error) {
-      setStatus({ type: 'success', msg: "Signalement validé !" });
-      fetchData();
-    }
+    await supabase.from('observations').update({ is_verified: true }).eq('id', id);
+    setStatus({ type: 'success', msg: "Validé !" });
+    fetchData();
     setLoading(false);
   };
 
   const handleDeleteObs = async (id: string) => {
-    if (!confirm("Rejeter ?")) return;
+    if (!confirm("Supprimer ?")) return;
     await supabase.from('observations').delete().eq('id', id);
     fetchData();
-  };
-
-  const exportToCSV = () => {
-    const headers = ["ID", "Species", "Description", "Created At"];
-    const rows = obsList.map(o => [o.id, o.species?.name || "Unknown", o.description, o.created_at]);
-    let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n" + rows.map(e => e.join(",")).join("\n");
-    const link = document.createElement("a");
-    link.setAttribute("href", encodeURI(csvContent));
-    link.setAttribute("download", "export_ecoatlas.csv");
-    document.body.appendChild(link);
-    link.click();
-  };
-
-  const exportToGeoJSON = () => {
-    const geojson = {
-      type: "FeatureCollection",
-      features: obsList.map(o => ({
-        type: "Feature",
-        properties: { species: o.species?.name, description: o.description, author: o.profiles?.full_name },
-        geometry: { type: "Point", coordinates: [0, 0] }
-      }))
-    };
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(geojson));
-    const link = document.createElement("a");
-    link.setAttribute("href", dataStr);
-    link.setAttribute("download", "export_ecoatlas.geojson");
-    document.body.appendChild(link);
-    link.click();
   };
 
   if (loading && !isAdmin) return <div className="flex justify-center py-24"><Loader2 className="animate-spin text-green-600" /></div>;
@@ -135,64 +110,94 @@ export default function AdminPage() {
     <div className="max-w-6xl mx-auto px-4 py-12">
       <div className="flex items-center space-x-4 mb-12">
         <div className="p-3 bg-stone-900 text-white rounded-2xl shadow-lg"><Shield className="h-8 w-8" /></div>
-        <div>
-          <h1 className="text-3xl font-bold text-stone-900">Panel Administrateur</h1>
-          <p className="text-stone-500 text-sm">Gestion globale d'Eco-Atlas Togo</p>
-        </div>
-        <Link href="/admin/carte" className="ml-auto bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold px-6 py-3 rounded-2xl flex items-center border border-stone-200"><MapIcon className="h-5 w-5 mr-2" /> SIG</Link>
+        <div><h1 className="text-3xl font-bold text-stone-900">Panel Administrateur</h1><p className="text-stone-500 text-sm">Dashboard décisionnel Togo</p></div>
+        <Link href="/admin/carte" className="ml-auto bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold px-6 py-3 rounded-2xl flex items-center transition-all border border-stone-200"><MapIcon className="h-5 w-5 mr-2" /> SIG</Link>
       </div>
-
-      {status && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className={`mb-8 p-4 rounded-2xl flex items-center ${status.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-          {status.type === 'success' ? <CheckCircle className="h-5 w-5 mr-3" /> : <AlertCircle className="h-5 w-5 mr-3" />}
-          <span className="font-medium">{status.msg}</span>
-        </motion.div>
-      )}
 
       <div className="flex flex-wrap gap-2 mb-8">
         {[
           { id: 'species', label: 'Espèces', icon: Leaf },
-          { id: 'docs', label: 'Docs', icon: Film },
-          { id: 'obs', label: 'Signalements', icon: Camera, badge: obsList.length },
-          { id: 'blog', label: 'Blog', icon: Newspaper },
-          { id: 'users', label: 'Membres', icon: Users }
+          { id: 'obs', label: 'Modération', icon: Camera, badge: obsList.length },
+          { id: 'users', label: 'Membres', icon: Users },
+          { id: 'insights', label: 'Insights', icon: BarChart3 }
         ].map((tab) => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-5 py-2.5 rounded-xl font-bold transition-all flex items-center text-xs ${activeTab === tab.id ? 'bg-green-600 text-white shadow-lg shadow-green-600/20' : 'bg-white text-stone-500 border border-stone-200 hover:bg-stone-50'}`}>
+          <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-6 py-2.5 rounded-xl font-bold transition-all flex items-center text-xs ${activeTab === tab.id ? 'bg-green-600 text-white shadow-lg shadow-green-600/20' : 'bg-white text-stone-500 border border-stone-200 hover:bg-stone-50'}`}>
             <tab.icon className="h-4 w-4 mr-2" /> {tab.label} {tab.badge ? <span className="ml-2 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">{tab.badge}</span> : null}
           </button>
         ))}
       </div>
 
-      {activeTab === 'obs' && (
-        <div className="space-y-6">
-          <div className="flex gap-2">
-            <button onClick={exportToCSV} className="bg-stone-100 px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2"><Save className="h-3 w-3" /> CSV</button>
-            <button onClick={exportToGeoJSON} className="bg-stone-100 px-4 py-2 rounded-xl font-bold text-xs flex items-center gap-2"><MapIcon className="h-3 w-3" /> GeoJSON</button>
-          </div>
-          <div className="grid grid-cols-1 gap-6">
-            {obsList.map(o => (
-              <div key={o.id} className="bg-white rounded-3xl border border-stone-100 overflow-hidden flex flex-col md:flex-row shadow-sm">
-                <img src={o.image_url} className="w-full md:w-48 h-48 object-cover" />
-                <div className="p-6 flex-1">
-                  <h3 className="font-bold text-stone-900">{o.species?.name || "Inconnu"} <span className="text-xs font-normal text-stone-400 ml-2">par {o.profiles?.full_name}</span></h3>
-                  <p className="text-stone-500 text-sm mt-2 mb-6 line-clamp-2">{o.description}</p>
-                  <div className="flex gap-3">
-                    <button onClick={() => handleVerifyObs(o.id)} className="flex-1 bg-green-600 text-white font-bold py-2 rounded-xl">Valider</button>
-                    <button onClick={() => handleDeleteObs(o.id)} className="flex-1 border border-red-100 text-red-600 font-bold py-2 rounded-xl">Rejeter</button>
-                  </div>
-                </div>
+      {activeTab === 'insights' && (
+        <div className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="bg-white p-8 rounded-3xl border border-stone-100 shadow-sm">
+              <h3 className="font-bold text-stone-900 mb-6 flex items-center"><MapIcon className="h-5 w-5 mr-2 text-green-600" /> Signalements par Région</h3>
+              <div className="h-64 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={adminStats?.byRegion}>
+                    <XAxis dataKey="name" fontSize={10} />
+                    <YAxis fontSize={10} />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="#16a34a" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
               </div>
-            ))}
+            </div>
+            <div className="bg-stone-900 text-white p-8 rounded-3xl shadow-xl flex flex-col justify-center text-center">
+              <h3 className="text-stone-400 font-bold uppercase text-[10px] tracking-widest mb-4">Gestion des Alertes</h3>
+              <span className="text-6xl font-bold mb-2">{adminStats?.resolvedAlerts} / {adminStats?.totalAlerts}</span>
+              <p className="text-sm text-stone-400 italic">Alertes urgentes résolues par les agents</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-3xl border border-stone-100 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-stone-50 bg-stone-50/50 font-bold text-sm">Suivi des alertes critiques</div>
+            <div className="divide-y divide-stone-50">
+              {allObsList.filter(o => o.type === 'alert').map(alert => (
+                <div key={alert.id} className="p-6 flex items-center justify-between hover:bg-stone-50 transition-all">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-3 h-3 rounded-full ${alert.is_resolved ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}></div>
+                    <div>
+                      <p className="font-bold text-stone-900 text-sm">{alert.description}</p>
+                      <p className="text-[10px] text-stone-400 uppercase font-bold">{alert.profiles?.region || 'Inconnue'}</p>
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => handleToggleResolve(alert.id, alert.is_resolved)}
+                    className={`px-4 py-2 rounded-xl text-[10px] font-bold transition-all ${alert.is_resolved ? 'bg-green-50 text-green-600' : 'bg-stone-900 text-white'}`}
+                  >
+                    {alert.is_resolved ? 'RÉSOU' : 'MARQUER RÉSOLU'}
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Les autres onglets restent mais simplifiés pour la stabilité */}
+      {activeTab === 'obs' && (
+        <div className="grid grid-cols-1 gap-6">
+          {obsList.map(o => (
+            <div key={o.id} className="bg-white rounded-3xl border border-stone-100 overflow-hidden flex flex-col md:flex-row shadow-sm">
+              <img src={o.image_url} className="w-full md:w-48 h-48 object-cover" />
+              <div className="p-6 flex-1">
+                <h3 className="font-bold text-stone-900">{o.species?.name || "Inconnu"} <span className="text-xs font-normal text-stone-400 ml-2">par {o.profiles?.full_name}</span></h3>
+                <p className="text-stone-500 text-sm mt-2 mb-6 line-clamp-2">{o.description}</p>
+                <div className="flex gap-3">
+                  <button onClick={() => handleVerifyObs(o.id)} className="flex-1 bg-green-600 text-white font-bold py-2 rounded-xl">Valider</button>
+                  <button onClick={() => handleDeleteObs(o.id)} className="flex-1 border border-red-100 text-red-600 font-bold py-2 rounded-xl">Rejeter</button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
       {activeTab === 'users' && (
         <div className="grid grid-cols-1 gap-4">
           {userList.map(u => (
             <div key={u.id} className="bg-white p-6 rounded-3xl border border-stone-100 flex items-center justify-between shadow-sm">
-              <h3 className="font-bold">{u.full_name || 'Utilisateur'} <span className="text-xs font-normal text-stone-400">({u.role})</span></h3>
+              <h3 className="font-bold">{u.full_name || 'Utilisateur'} <span className="text-xs font-normal text-stone-400 ml-2">({u.region})</span></h3>
               <select value={u.role} onChange={(e) => handleUpdateRole(u.id, e.target.value)} className="bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-xs font-bold">
                 <option value="user">Utilisateur</option><option value="expert">Expert</option><option value="admin">Administrateur</option>
               </select>
