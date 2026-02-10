@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, X, Leaf, Map, Film, Info, Camera, Shield } from 'lucide-react';
+import { Menu, X, Leaf, Map, Film, Info, Camera, Shield, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 
@@ -69,6 +69,16 @@ export function Navbar() {
               </Link>
             ))}
             
+            {user && (
+              <Link
+                href="/profil"
+                className="text-stone-600 hover:text-green-600 transition-colors font-medium flex items-center space-x-1 text-sm"
+              >
+                <User className="h-4 w-4" />
+                <span>Mon Profil</span>
+              </Link>
+            )}
+
             {user && (
               <Link
                 href="/signaler"
