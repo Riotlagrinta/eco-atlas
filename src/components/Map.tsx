@@ -5,6 +5,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.fullscreen/Control.FullScreen.css';
 import 'leaflet.fullscreen';
+import 'leaflet.heat';
 import { FullscreenControl } from 'react-leaflet-fullscreen';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
@@ -13,6 +14,35 @@ import { OpenStreetMapProvider, GeoSearchControl } from 'leaflet-geosearch';
 import 'leaflet-geosearch/dist/geosearch.css';
 
 const { BaseLayer, Overlay } = LayersControl;
+
+// Composant pour la couche de chaleur
+function HeatmapLayer({ observations }: { observations: Observation[] }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!observations || observations.length === 0) return;
+
+    const points = observations.map(o => [
+      o.coordinates.coordinates[1], 
+      o.coordinates.coordinates[0], 
+      0.5 // Intensité
+    ]);
+
+    const heatLayer = (L as any).heatLayer(points, {
+      radius: 25,
+      blur: 15,
+      maxZoom: 10,
+      gradient: { 0.4: 'blue', 0.65: 'lime', 1: 'red' }
+    });
+
+    heatLayer.addTo(map);
+    return () => {
+      map.removeLayer(heatLayer);
+    };
+  }, [observations, map]);
+
+  return null;
+}
 
 // Composant pour la recherche géographique
 function SearchField() {
@@ -202,6 +232,10 @@ export default function Map({ center = [8.6195, 1.1915], zoom = 7, filter = 'all
             attribution='&copy; NASA FIRMS'
             url="https://firms.modaps.eosdis.nasa.gov/mapserver/wms/fires/global/?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=fires_24&STYLES=&FORMAT=image/png&TRANSPARENT=true&HEIGHT=256&WIDTH=256&SRS=EPSG:3857&BBOX={bbox-epsg-3857}"
           />
+        </Overlay>
+
+        <Overlay name="Densité Biodiversité (Heatmap)">
+          <HeatmapLayer observations={observations} />
         </Overlay>
         
         <SearchField />
