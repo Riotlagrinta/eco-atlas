@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, X, Leaf, Map, Film, Info, Camera, Shield, User, Newspaper, Bell, Clock, Globe, Target, Brain, ShieldCheck } from 'lucide-react';
+import { Menu, X, Leaf, Map, Film, Info, Camera, Shield, User, Newspaper, Bell, Clock, Globe, Target, Brain, ShieldCheck, Trees } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 import { translations } from '@/lib/i18n';
@@ -21,6 +21,7 @@ export function Navbar() {
 
   const navItems = [
     { name: t.obs, href: '/observatoire', icon: Leaf },
+    { name: 'Parcs', href: '/parcs', icon: Trees },
     { name: t.map, href: '/carte', icon: Map },
     { name: 'Missions', href: '/missions', icon: Target },
     { name: 'Galerie', href: '/galerie', icon: Camera },
