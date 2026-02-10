@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { Search, Filter, Info, Leaf, Map as MapIcon } from 'lucide-react';
+import { Search, Filter, Info, Leaf, Map as MapIcon, Loader2, MapPin } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { motion } from 'framer-motion';
 
 const Map = dynamic(() => import('@/components/Map'), {
   ssr: false,

@@ -9,6 +9,7 @@ import toast, { Toaster } from 'react-hot-toast';
 
 export default function SignalerPage() {
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   
   useEffect(() => {

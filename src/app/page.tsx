@@ -2,24 +2,35 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Leaf, Map, Shield, PlayCircle, Newspaper } from 'lucide-react';
+import { ArrowRight, Leaf, Map, Shield, PlayCircle, Newspaper, Camera } from 'lucide-react';
 import { WeatherWidget } from '@/components/WeatherWidget';
 import { createClient } from '@/lib/supabase/client';
 import { translations } from '@/lib/i18n';
 
 export default function Home() {
   const [latestArticles, setLatestArticles] = useState<any[]>([]);
+  const [latestObs, setLatestObs] = useState<any[]>([]);
   const [lang, setLang] = useState<'fr' | 'ee' | 'kby'>('fr');
   const supabase = createClient();
 
   useEffect(() => {
     async function fetchData() {
-      const { data } = await supabase
+      // Fetch Articles
+      const { data: arts } = await supabase
         .from('articles')
         .select('*')
         .order('created_at', { ascending: false })
         .limit(3);
-      if (data) setLatestArticles(data);
+      if (arts) setLatestArticles(arts);
+
+      // Fetch Observations
+      const { data: obs } = await supabase
+        .from('observations')
+        .select('*, species:species_id(name)')
+        .eq('is_verified', true)
+        .order('created_at', { ascending: false })
+        .limit(6);
+      if (obs) setLatestObs(obs);
     }
     fetchData();
   }, [supabase]);
@@ -67,6 +78,30 @@ export default function Home() {
         <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-6 ml-4">Météo des Parcs</h3>
         <WeatherWidget />
       </section>
+
+      {/* Direct du Terrain */}
+      {latestObs && latestObs.length > 0 && (
+        <section className="py-24 bg-white overflow-hidden">
+          <div className="max-w-7xl mx-auto px-4 mb-12">
+            <h2 className="text-3xl font-bold text-stone-900 tracking-tight flex items-center">
+              <Camera className="h-8 w-8 text-green-600 mr-3" /> En direct du terrain
+            </h2>
+            <p className="text-stone-500 mt-2">Dernières observations validées par nos experts au Togo.</p>
+          </div>
+          
+          <div className="flex space-x-6 overflow-x-auto pb-8 px-4 scrollbar-hide">
+            {latestObs.map((obs) => (
+              <div key={obs.id} className="min-w-[280px] h-80 relative rounded-3xl overflow-hidden shadow-xl border border-stone-100 group">
+                <img src={obs.image_url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="Terrain" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-6">
+                  <span className="text-[10px] font-bold text-green-400 uppercase tracking-widest mb-1">{obs.species?.name || "Espèce inconnue"}</span>
+                  <p className="text-white text-sm font-medium line-clamp-2">{obs.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* News Section */}
       {latestArticles && latestArticles.length > 0 && (
