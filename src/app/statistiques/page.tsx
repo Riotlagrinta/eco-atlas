@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { BarChart3, PieChart, Activity, ShieldCheck, Leaf, Users, Loader2, ArrowUpRight } from 'lucide-react';
+import { BarChart3, PieChart, Activity, ShieldCheck, Leaf, Users, Loader2, ArrowUpRight, Trophy } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as ChartTooltip, Cell, PieChart as RePieChart, Pie } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as ChartTooltip, Cell, PieChart as RePieChart, Pie, LineChart, Line, CartesianGrid } from 'recharts';
 
 export default function StatistiquesPage() {
   const [loading, setLoading] = useState(true);
@@ -13,7 +13,9 @@ export default function StatistiquesPage() {
     protectedCount: 0,
     obsCount: 0,
     userCount: 0,
-    byStatus: [] as any[]
+    byStatus: [] as any[],
+    trends: [] as any[],
+    leaderboard: [] as any[]
   });
 
   const supabase = createClient();
@@ -25,15 +27,35 @@ export default function StatistiquesPage() {
         { count: pCount },
         { count: oCount },
         { count: uCount },
-        { data: speciesData }
+        { data: speciesData },
+        { data: obsData },
+        { data: leaderData }
       ] = await Promise.all([
         supabase.from('species').select('*', { count: 'exact', head: true }),
         supabase.from('protected_areas').select('*', { count: 'exact', head: true }),
         supabase.from('observations').select('*', { count: 'exact', head: true }).eq('is_verified', true),
         supabase.from('profiles').select('*', { count: 'exact', head: true }),
-        supabase.from('species').select('conservation_status')
+        supabase.from('species').select('conservation_status'),
+        supabase.from('observations').select('created_at').eq('is_verified', true),
+        supabase.from('profiles').select('full_name, avatar_url, role, observations(count)').limit(5)
       ]);
 
+      // Calcul des tendances par mois
+      const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
+      const currentYear = new Date().getFullYear();
+      const trendMap: any = {};
+      months.forEach(m => trendMap[m] = 0);
+      
+      obsData?.forEach((o: any) => {
+        const date = new Date(o.created_at);
+        if (date.getFullYear() === currentYear) {
+          trendMap[months[date.getMonth()]]++;
+        }
+      });
+
+      const trendData = months.map(m => ({ name: m, signalements: trendMap[m] }));
+
+      // ... (byStatus calculation)
       const statusCount: any = { CR: 0, EN: 0, VU: 0, NT: 0, LC: 0 };
       speciesData?.forEach((s: any) => {
         if (statusCount[s.conservation_status] !== undefined) statusCount[s.conservation_status]++;
@@ -52,7 +74,9 @@ export default function StatistiquesPage() {
         protectedCount: pCount || 0,
         obsCount: oCount || 0,
         userCount: uCount || 0,
-        byStatus: chartData
+        byStatus: chartData,
+        trends: trendData,
+        leaderboard: leaderData || []
       });
       setLoading(false);
     }
@@ -92,6 +116,49 @@ export default function StatistiquesPage() {
             <span className="text-sm font-bold text-stone-400 uppercase tracking-widest">{item.label}</span>
           </motion.div>
         ))}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-12">
+        {/* Évolution temporelle */}
+        <div className="lg:col-span-2 bg-stone-50 rounded-3xl p-8 border border-stone-100">
+          <h3 className="text-xl font-bold text-stone-900 mb-8 flex items-center">
+            <Activity className="h-5 w-5 mr-2 text-green-600" /> Évolution des Signalements ({new Date().getFullYear()})
+          </h3>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={stats.trends}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                <XAxis dataKey="name" fontSize={10} tickLine={false} axisLine={false} />
+                <YAxis fontSize={10} tickLine={false} axisLine={false} />
+                <ChartTooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                <Line type="monotone" dataKey="signalements" stroke="#16a34a" strokeWidth={3} dot={{ r: 4, fill: '#16a34a' }} activeDot={{ r: 6 }} />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Classement Sentinelles */}
+        <div className="bg-white rounded-3xl p-8 border border-stone-100 shadow-sm">
+          <h3 className="text-xl font-bold text-stone-900 mb-8 flex items-center">
+            <Trophy className="h-5 w-5 mr-2 text-yellow-500" /> Sentinelles du Togo
+          </h3>
+          <div className="space-y-6">
+            {stats.leaderboard.map((user, i) => (
+              <div key={i} className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-stone-100 rounded-full flex items-center justify-center font-bold text-xs text-stone-500">
+                    {i + 1}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-stone-900">{user.full_name || 'Éco-citoyen'}</p>
+                    <p className="text-[10px] text-stone-400 font-bold uppercase tracking-widest">{user.role}</p>
+                  </div>
+                </div>
+                <span className="text-xs font-bold text-green-600">+{user.observations?.[0]?.count || 0}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

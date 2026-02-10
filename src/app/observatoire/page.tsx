@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Leaf, Search, AlertTriangle, Loader2, X, Share2, Heart, MessageSquare, Send, User } from 'lucide-react';
+import { Leaf, Search, AlertTriangle, Loader2, X, Share2, Heart, MessageSquare, Send, User, MapPin } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import dynamic from 'next/dynamic';
 
