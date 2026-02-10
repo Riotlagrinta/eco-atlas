@@ -22,6 +22,19 @@ export default function DocumentairesPage() {
   const [filter, setFilter] = useState('Tous');
   const supabase = createClient();
 
+  // Fonction pour transformer n'importe quel lien YouTube en lien d'intégration (embed)
+  const getEmbedUrl = (url: string) => {
+    let videoId = '';
+    if (url.includes('v=')) {
+      videoId = url.split('v=')[1].split('&')[0];
+    } else if (url.includes('embed/')) {
+      videoId = url.split('embed/')[1].split('?')[0];
+    } else if (url.includes('youtu.be/')) {
+      videoId = url.split('youtu.be/')[1].split('?')[0];
+    }
+    return `https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`;
+  };
+
   useEffect(() => {
     async function fetchDocs() {
       const { data } = await supabase
@@ -41,21 +54,21 @@ export default function DocumentairesPage() {
     <div className="min-h-screen bg-white text-stone-900 pt-12 pb-24">
       <div className="max-w-7xl mx-auto px-4">
         
-        {/* Lecteur Vidéo Intégré - Fond Clair */}
+        {/* Lecteur Vidéo Intégré */}
         {selectedDoc && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-100/95 backdrop-blur-md">
-            <div className="w-full max-w-5xl aspect-video relative bg-white rounded-3xl overflow-hidden shadow-2xl border border-stone-200">
+            <div className="w-full max-w-5xl aspect-video relative bg-black rounded-3xl overflow-hidden shadow-2xl border border-stone-200">
               <iframe 
-                src={`${selectedDoc.video_url}?autoplay=1`}
+                src={getEmbedUrl(selectedDoc.video_url)}
                 className="w-full h-full"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
               ></iframe>
               <button 
                 onClick={() => setSelectedDoc(null)}
-                className="absolute -top-12 right-0 text-stone-900 hover:text-green-600 font-bold flex items-center transition-all"
+                className="absolute -top-10 right-0 text-stone-900 hover:text-green-600 font-bold flex items-center transition-all bg-white px-4 py-1 rounded-t-xl border-t border-x border-stone-200"
               >
-                Fermer <X className="ml-2 h-6 w-6" />
+                Fermer <X className="ml-2 h-5 w-5" />
               </button>
             </div>
           </div>
