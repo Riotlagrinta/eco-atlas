@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, X, Leaf, Map, Film, Info, Camera, Shield, User, Newspaper } from 'lucide-react';
+import { Menu, X, Leaf, Map, Film, Info, Camera, Shield, User, Newspaper, Bell, Clock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 
@@ -18,7 +18,24 @@ export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [showNotifs, setShowNotifs] = useState(false);
   const supabase = createClient();
+
+  const fetchNotifications = async (userId: string) => {
+    const { data } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('is_read', false)
+      .order('created_at', { ascending: false });
+    if (data) setNotifications(data);
+  };
+
+  const markAsRead = async (id: string) => {
+    await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+    setNotifications(notifications.filter(n => n.id !== id));
+  };
 
   useEffect(() => {
     const checkUser = async () => {
@@ -32,13 +49,17 @@ export function Navbar() {
           .eq('id', user.id)
           .single();
         if (profile?.role === 'admin') setIsAdmin(true);
+        fetchNotifications(user.id);
       }
     };
     checkUser();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-      if (!session) setIsAdmin(false);
+      if (!session) {
+        setIsAdmin(false);
+        setNotifications([]);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -70,6 +91,43 @@ export function Navbar() {
               </Link>
             ))}
             
+            {user && (
+              <div className="relative">
+                <button 
+                  onClick={() => setShowNotifs(!showNotifs)}
+                  className="relative p-2 text-stone-400 hover:text-green-600 transition-all"
+                >
+                  <Bell className="h-5 w-5" />
+                  {notifications.length > 0 && (
+                    <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center border-2 border-white">
+                      {notifications.length}
+                    </span>
+                  )}
+                </button>
+
+                {showNotifs && (
+                  <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-stone-100 overflow-hidden z-50">
+                    <div className="p-4 bg-stone-50 border-b border-stone-100 flex justify-between items-center">
+                      <span className="font-bold text-xs text-stone-500 uppercase tracking-widest">Notifications</span>
+                    </div>
+                    <div className="max-h-96 overflow-y-auto">
+                      {notifications.length > 0 ? notifications.map(n => (
+                        <div key={n.id} className="p-4 border-b border-stone-50 hover:bg-stone-50 transition-colors">
+                          <p className="text-sm text-stone-700 leading-relaxed mb-2">{n.message}</p>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] text-stone-400 flex items-center"><Clock className="h-3 w-3 mr-1" /> Juste maintenant</span>
+                            <button onClick={() => markAsRead(n.id)} className="text-[10px] font-bold text-green-600 hover:underline">Marquer comme lu</button>
+                          </div>
+                        </div>
+                      )) : (
+                        <div className="p-8 text-center text-stone-400 text-sm">Aucune nouvelle notification</div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             {user && (
               <Link
                 href="/profil"

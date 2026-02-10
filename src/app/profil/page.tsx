@@ -10,6 +10,7 @@ export default function ProfilPage() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<any>(null);
   const [observations, setObservations] = useState<any[]>([]);
+  const [badges, setBadges] = useState<any[]>([]);
   const router = useRouter();
   const supabase = createClient();
 
@@ -38,6 +39,15 @@ export default function ProfilPage() {
         .order('created_at', { ascending: false });
       
       if (obsData) setObservations(obsData);
+
+      // Fetch User's Badges
+      const { data: badgeData } = await supabase
+        .from('user_badges')
+        .select('*, badges(*)')
+        .eq('user_id', user.id);
+      
+      if (badgeData) setBadges(badgeData);
+
       setLoading(false);
     }
     fetchData();
@@ -87,6 +97,33 @@ export default function ProfilPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         {/* Sidebar Info */}
         <div className="space-y-8">
+          <div className="bg-white p-8 rounded-3xl border border-stone-100 shadow-sm text-center">
+            <h3 className="font-bold text-stone-900 mb-6 flex items-center justify-center">
+              <Award className="h-5 w-5 mr-2 text-green-600" /> Mes Trophées
+            </h3>
+            <div className="grid grid-cols-2 gap-4">
+              {badges.map((ub) => (
+                <div key={ub.id} className="group relative flex flex-col items-center">
+                  <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center border border-green-100 mb-2 group-hover:scale-110 transition-transform">
+                    <Award className="h-8 w-8 text-green-600" />
+                  </div>
+                  <span className="text-[10px] font-bold text-stone-700 uppercase">{ub.badges?.name}</span>
+                  
+                  {/* Tooltip description */}
+                  <div className="absolute -top-12 scale-0 group-hover:scale-100 bg-stone-900 text-white text-[10px] p-2 rounded shadow-xl transition-all w-32 z-10">
+                    {ub.badges?.description}
+                  </div>
+                </div>
+              ))}
+              
+              {badges.length === 0 && (
+                <div className="col-span-2 py-4 text-stone-400 text-xs italic">
+                  Continuez vos actions pour débloquer des badges !
+                </div>
+              )}
+            </div>
+          </div>
+
           <div className="bg-white p-8 rounded-3xl border border-stone-100 shadow-sm">
             <h3 className="font-bold text-stone-900 mb-6 flex items-center">
               <User className="h-5 w-5 mr-2 text-green-600" /> Informations
