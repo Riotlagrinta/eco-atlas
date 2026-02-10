@@ -2,12 +2,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { BarChart3, PieChart, Activity, ShieldCheck, Leaf, Users, Loader2, ArrowUpRight, Trophy, Globe } from 'lucide-react';
+import { BarChart3, PieChart, Activity, ShieldCheck, Leaf, Users, Loader2, ArrowUpRight, Trophy, Globe, Map as MapIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as ChartTooltip, Cell, LineChart, Line, CartesianGrid } from 'recharts';
+import { TogoRegionalMap } from '@/components/TogoRegionalMap';
 
 export default function StatistiquesPage() {
   const [loading, setLoading] = useState(true);
+  const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
   const [stats, setStats] = useState({
     speciesCount: 0,
     protectedCount: 0,
@@ -124,22 +126,36 @@ export default function StatistiquesPage() {
 
       {/* NOUVEAU : PALMARÈS DES RÉGIONS */}
       <div className="mb-12 bg-stone-50 rounded-3xl p-8 border border-stone-100">
-        <h3 className="text-xl font-bold text-stone-900 mb-8 flex items-center">
-          <Globe className="h-5 w-5 mr-2 text-green-600" /> Ligue des Régions du Togo
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-          {stats.regionalRank.length > 0 ? stats.regionalRank.sort((a,b) => b.count - a.count).map((reg, i) => (
-            <div key={i} className="bg-white p-6 rounded-2xl border border-stone-100 text-center shadow-sm relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-2 opacity-5 group-hover:opacity-10 transition-opacity">
-                <Globe className="h-12 w-12 text-stone-900" />
-              </div>
-              <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-2 block">{reg.name}</span>
-              <span className="block text-3xl font-bold text-stone-900">{reg.count}</span>
-              <span className="text-[10px] font-bold text-green-600 uppercase mt-2 block">Contributions</span>
+        <div className="flex flex-col lg:flex-row gap-12 items-center">
+          <div className="flex-1">
+            <h3 className="text-xl font-bold text-stone-900 mb-8 flex items-center">
+              <Globe className="h-5 w-5 mr-2 text-green-600" /> Ligue des Régions du Togo
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {stats.regionalRank.sort((a,b) => b.count - a.count).map((reg, i) => (
+                <div 
+                  key={i} 
+                  onClick={() => setSelectedRegion(reg.name === selectedRegion ? null : reg.name)}
+                  className={cn(
+                    "p-6 rounded-2xl border transition-all cursor-pointer",
+                    selectedRegion === reg.name ? "bg-green-600 border-green-600 shadow-lg shadow-green-600/20" : "bg-white border-stone-100 hover:border-green-200"
+                  )}
+                >
+                  <span className={cn("text-[10px] font-bold uppercase mb-2 block", selectedRegion === reg.name ? "text-green-100" : "text-stone-400")}>{reg.name}</span>
+                  <span className={cn("block text-3xl font-bold", selectedRegion === reg.name ? "text-white" : "text-stone-900")}>{reg.count}</span>
+                </div>
+              ))}
             </div>
-          )) : (
-            <p className="col-span-full text-center text-stone-400 text-sm italic py-4">Désignez votre région dans votre profil pour participer à la ligue !</p>
-          )}
+          </div>
+          
+          <div className="w-full lg:w-1/3 flex flex-col items-center">
+            <TogoRegionalMap 
+              activeRegion={selectedRegion} 
+              onRegionClick={(r) => setSelectedRegion(r === selectedRegion ? null : r)} 
+              regionalData={stats.regionalRank} 
+            />
+            <p className="text-[10px] text-stone-400 mt-6 font-bold uppercase tracking-widest italic">Carte interactive du territoire</p>
+          </div>
         </div>
       </div>
 
@@ -213,7 +229,12 @@ export default function StatistiquesPage() {
             <ShieldCheck className="h-5 w-5 mr-2" /> Rapport PDF
           </button>
         </div>
-      </div>
-    </div>
-  );
-}
+            </div>
+          </div>
+        );
+      }
+      
+      function cn(...classes: string[]) {
+        return classes.filter(Boolean).join(' ');
+      }
+      

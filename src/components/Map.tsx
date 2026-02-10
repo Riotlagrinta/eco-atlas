@@ -3,8 +3,6 @@
 import { MapContainer, TileLayer, Marker, Popup, Polygon, LayersControl, Tooltip, ScaleControl, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import 'leaflet.fullscreen/Control.FullScreen.css';
-import 'leaflet.fullscreen';
 import 'leaflet.heat';
 import { FullscreenControl } from 'react-leaflet-fullscreen';
 import { useEffect, useState } from 'react';
