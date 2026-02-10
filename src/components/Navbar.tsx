@@ -10,6 +10,7 @@ const navItems = [
   { name: 'Observatoire', href: '/observatoire', icon: Leaf },
   { name: 'Carte', href: '/carte', icon: Map },
   { name: 'Documentaires', href: '/documentaires', icon: Film },
+  { name: 'Statistiques', href: '/statistiques', icon: Info },
   { name: 'À propos', href: '/a-propos', icon: Info },
 ];
 
