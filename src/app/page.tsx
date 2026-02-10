@@ -1,9 +1,16 @@
 import React from 'react';
 import Link from 'next/link';
-import { ArrowRight, Leaf, Map, Shield, PlayCircle } from 'lucide-react';
+import { ArrowRight, Leaf, Map, Shield, PlayCircle, Newspaper } from 'lucide-react';
 import { WeatherWidget } from '@/components/WeatherWidget';
+import { createClient } from '@/lib/supabase/server';
 
-export default function Home() {
+export default async function Home() {
+  const supabase = await createClient();
+  const { data: latestArticles } = await supabase
+    .from('articles')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(3);
   return (
     <div className="flex flex-col w-full bg-white">
       {/* Hero Section - Version Lumineuse */}
@@ -50,6 +57,35 @@ export default function Home() {
         <h3 className="text-sm font-bold text-stone-400 uppercase tracking-widest mb-6 ml-4">Météo des Parcs en Temps Réel</h3>
         <WeatherWidget />
       </section>
+
+      {/* News Section */}
+      {latestArticles && latestArticles.length > 0 && (
+        <section className="py-24 bg-white border-t border-stone-50">
+          <div className="max-w-7xl mx-auto px-4">
+            <div className="flex justify-between items-end mb-12">
+              <div>
+                <h2 className="text-3xl font-bold text-stone-900 tracking-tight">Dernières Actualités</h2>
+                <div className="h-1 w-12 bg-green-500 mt-2"></div>
+              </div>
+              <Link href="/actualites" className="text-green-600 font-bold text-sm hover:underline flex items-center">
+                Voir tout le blog <ArrowRight className="ml-1 h-4 w-4" />
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {latestArticles.map((article) => (
+                <Link key={article.id} href="/actualites" className="group">
+                  <div className="aspect-video rounded-2xl overflow-hidden bg-stone-100 mb-4 border border-stone-100 shadow-sm transition-all group-hover:shadow-lg">
+                    <img src={article.image_url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="News" />
+                  </div>
+                  <h4 className="font-bold text-stone-900 group-hover:text-green-600 transition-colors line-clamp-2">{article.title}</h4>
+                  <p className="text-[10px] text-stone-400 mt-2 font-bold uppercase tracking-widest">{article.category}</p>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Reste des sections (Features, CTA) */}
       <section className="py-24 bg-white">

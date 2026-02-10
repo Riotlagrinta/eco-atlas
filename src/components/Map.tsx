@@ -3,6 +3,9 @@
 import { MapContainer, TileLayer, Marker, Popup, Polygon, LayersControl, Tooltip, ScaleControl, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet.fullscreen/Control.FullScreen.css';
+import 'leaflet.fullscreen';
+import { FullscreenControl } from 'react-leaflet-fullscreen';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { LocateFixed, Search, Flame } from 'lucide-react';
@@ -249,6 +252,7 @@ export default function Map({ center = [8.6195, 1.1915], zoom = 7, filter = 'all
             </Popup>
           </Marker>
         ))}
+        <FullscreenControl position="topleft" />
         <ScaleControl position="bottomleft" imperial={false} />
         <LocationButton />
       </MapContainer>

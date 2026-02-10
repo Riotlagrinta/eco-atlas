@@ -23,6 +23,7 @@ export function Navbar() {
     { name: t.obs, href: '/observatoire', icon: Leaf },
     { name: t.map, href: '/carte', icon: Map },
     { name: 'Missions', href: '/missions', icon: Target },
+    { name: 'Galerie', href: '/galerie', icon: Camera },
     { name: 'Eco-Stream', href: '/documentaires', icon: Film },
     { name: 'Partenaires', href: '/organisations', icon: ShieldCheck },
     { name: 'Actualités', href: '/actualites', icon: Newspaper },
