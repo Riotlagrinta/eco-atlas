@@ -16,7 +16,9 @@ export default function SignalerPage() {
   const [formData, setFormData] = useState({
     species_id: '',
     description: '',
-    image_url: ''
+    image_url: '',
+    type: 'observation',
+    alert_level: 'low'
   });
 
   const router = useRouter();
@@ -84,11 +86,13 @@ export default function SignalerPage() {
     const { error } = await supabase.from('observations').insert([
       {
         user_id: user?.id,
-        species_id: formData.species_id || null,
+        species_id: formData.type === 'observation' ? (formData.species_id || null) : null,
         description: formData.description,
         image_url: formData.image_url,
         location: `POINT(${coords.lng} ${coords.lat})`,
-        is_verified: false
+        is_verified: formData.type === 'alert' ? true : false, // Les alertes sont visibles immédiatement pour la sécurité
+        type: formData.type,
+        alert_level: formData.alert_level
       }
     ]);
 
@@ -129,6 +133,23 @@ export default function SignalerPage() {
             <span className="font-bold">{coords ? 'Position capturée' : 'Activer ma position GPS'}</span>
           </button>
 
+          <div className="flex p-1 bg-stone-100 rounded-2xl mb-6">
+            <button
+              type="button"
+              onClick={() => setFormData({...formData, type: 'observation'})}
+              className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${formData.type === 'observation' ? 'bg-white text-green-600 shadow-sm' : 'text-stone-500'}`}
+            >
+              Observation
+            </button>
+            <button
+              type="button"
+              onClick={() => setFormData({...formData, type: 'alert'})}
+              className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${formData.type === 'alert' ? 'bg-red-600 text-white shadow-sm' : 'text-stone-500'}`}
+            >
+              Alerte Urgente
+            </button>
+          </div>
+
           <div className="relative">
             <input type="file" id="obs-upload" className="hidden" accept="image/*" onChange={handleFileUpload} />
             <label htmlFor="obs-upload" className={`flex flex-col items-center justify-center w-full aspect-video rounded-2xl border-2 border-dashed transition-all cursor-pointer overflow-hidden ${formData.image_url ? 'border-green-500' : 'border-stone-200 hover:border-green-400'}`}>
@@ -139,17 +160,32 @@ export default function SignalerPage() {
             </label>
           </div>
 
-          <div>
-            <label className="block text-sm font-bold text-stone-700 mb-2 ml-1">Espèce (si connue)</label>
-            <select
-              value={formData.species_id}
-              onChange={(e) => setFormData({ ...formData, species_id: e.target.value })}
-              className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none transition-all"
-            >
-              <option value="">Je ne sais pas</option>
-              {species.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-          </div>
+          {formData.type === 'observation' ? (
+            <div>
+              <label className="block text-sm font-bold text-stone-700 mb-2 ml-1">Espèce (si connue)</label>
+              <select
+                value={formData.species_id}
+                onChange={(e) => setFormData({ ...formData, species_id: e.target.value })}
+                className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-green-500 outline-none transition-all"
+              >
+                <option value="">Je ne sais pas</option>
+                {species.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-sm font-bold text-red-700 mb-2 ml-1">Niveau d'Urgence</label>
+              <select
+                value={formData.alert_level}
+                onChange={(e) => setFormData({ ...formData, alert_level: e.target.value })}
+                className="w-full px-4 py-3 bg-red-50 border border-red-100 text-red-700 font-bold rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition-all"
+              >
+                <option value="medium">Moyen (Pollution, déchet)</option>
+                <option value="high">Élevé (Abattage d'arbres)</option>
+                <option value="critical">Critique (Braconnage, Feu de brousse)</option>
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-bold text-stone-700 mb-2 ml-1">Détails de l'observation</label>

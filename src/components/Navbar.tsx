@@ -2,17 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, X, Leaf, Map, Film, Info, Camera, Shield, User, Newspaper, Bell, Clock } from 'lucide-react';
+import { Menu, X, Leaf, Map, Film, Info, Camera, Shield, User, Newspaper, Bell, Clock, Globe } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
-
-const navItems = [
-  { name: 'Observatoire', href: '/observatoire', icon: Leaf },
-  { name: 'Carte', href: '/carte', icon: Map },
-  { name: 'Documentaires', href: '/documentaires', icon: Film },
-  { name: 'Actualités', href: '/actualites', icon: Newspaper },
-  { name: 'Statistiques', href: '/statistiques', icon: Info },
-];
+import { translations } from '@/lib/i18n';
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
@@ -20,7 +13,17 @@ export function Navbar() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifs, setShowNotifs] = useState(false);
+  const [lang, setLang] = useState<'fr' | 'ee' | 'kby'>('fr');
   const supabase = createClient();
+
+  const t = translations[lang];
+
+  const navItems = [
+    { name: t.obs, href: '/observatoire', icon: Leaf },
+    { name: t.map, href: '/carte', icon: Map },
+    { name: 'Eco-Stream', href: '/documentaires', icon: Film },
+    { name: 'Actualités', href: '/actualites', icon: Newspaper },
+  ];
 
   const fetchNotifications = async (userId: string) => {
     const { data } = await supabase
@@ -91,8 +94,16 @@ export function Navbar() {
               </Link>
             ))}
             
+            {/* Language Switcher */}
+            <div className="flex items-center space-x-1 bg-stone-100 p-1 rounded-lg mr-4">
+              <button onClick={() => setLang('fr')} className={`text-[9px] px-2 py-1 rounded font-bold ${lang === 'fr' ? 'bg-white text-green-600 shadow-sm' : 'text-stone-400'}`}>FR</button>
+              <button onClick={() => setLang('ee')} className={`text-[9px] px-2 py-1 rounded font-bold ${lang === 'ee' ? 'bg-white text-green-600 shadow-sm' : 'text-stone-400'}`}>EE</button>
+              <button onClick={() => setLang('kby')} className={`text-[9px] px-2 py-1 rounded font-bold ${lang === 'kby' ? 'bg-white text-green-600 shadow-sm' : 'text-stone-400'}`}>KBY</button>
+            </div>
+
             {user && (
               <div className="relative">
+                {/* ... existing bell icon code ... */}
                 <button 
                   onClick={() => setShowNotifs(!showNotifs)}
                   className="relative p-2 text-stone-400 hover:text-green-600 transition-all"
@@ -134,7 +145,7 @@ export function Navbar() {
                 className="text-stone-600 hover:text-green-600 transition-colors font-medium flex items-center space-x-1 text-sm"
               >
                 <User className="h-4 w-4" />
-                <span>Mon Profil</span>
+                <span>Profil</span>
               </Link>
             )}
 
@@ -144,7 +155,7 @@ export function Navbar() {
                 className="text-emerald-600 hover:text-emerald-700 transition-colors font-bold flex items-center space-x-1 text-sm bg-emerald-50 px-3 py-1.5 rounded-lg"
               >
                 <Camera className="h-4 w-4" />
-                <span>Signaler</span>
+                <span>{t.signaler}</span>
               </Link>
             )}
 
@@ -163,7 +174,7 @@ export function Navbar() {
                 href="/connexion"
                 className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-full font-bold text-sm transition-all shadow-md hover:shadow-green-500/20"
               >
-                Connexion
+                {t.connexion}
               </Link>
             ) : (
               <button 

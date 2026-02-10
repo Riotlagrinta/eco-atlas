@@ -88,11 +88,20 @@ interface Observation {
   description: string;
   image_url: string;
   species_name: string;
+  type: 'observation' | 'alert';
+  alert_level: 'low' | 'medium' | 'high' | 'critical';
   coordinates: {
     type: string;
     coordinates: [number, number];
   };
 }
+
+// Icône personnalisée pour les alertes (Feu/Danger)
+const AlertIcon = L.icon({
+  iconUrl: 'https://cdn-icons-png.flaticon.com/512/1672/1672451.png', // Flamme rouge
+  iconSize: [35, 35],
+  iconAnchor: [17, 35],
+});
 
 interface MapProps {
   center?: [number, number];
@@ -204,13 +213,21 @@ export default function Map({ center = [8.6195, 1.1915], zoom = 7, filter = 'all
           <Marker 
             key={obs.id} 
             position={[obs.coordinates.coordinates[1], obs.coordinates.coordinates[0]]}
+            icon={obs.type === 'alert' ? AlertIcon : DefaultIcon}
           >
-            <Popup className="custom-popup">
+            <Popup className={obs.type === 'alert' ? 'alert-popup' : 'custom-popup'}>
               <div className="w-48">
                 {obs.image_url && (
                   <img src={obs.image_url} className="w-full h-32 object-cover rounded-lg mb-2" alt="Observation" />
                 )}
-                <div className="font-bold text-green-700">{obs.species_name || "Observation citoyenne"}</div>
+                {obs.type === 'alert' && (
+                  <div className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full mb-2 inline-block uppercase tracking-widest">
+                    Alerte : {obs.alert_level}
+                  </div>
+                )}
+                <div className={`font-bold ${obs.type === 'alert' ? 'text-red-600' : 'text-green-700'}`}>
+                  {obs.type === 'alert' ? "DANGER SIGNALÉ" : (obs.species_name || "Observation citoyenne")}
+                </div>
                 <p className="text-xs text-stone-600 mt-1 line-clamp-2">{obs.description}</p>
               </div>
             </Popup>
