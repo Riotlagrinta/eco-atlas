@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { BarChart3, PieChart, Activity, ShieldCheck, Leaf, Users, Loader2, ArrowUpRight, Trophy, Globe } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, ChartTooltip, Cell, LineChart, Line, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as ChartTooltip, Cell, LineChart, Line, CartesianGrid } from 'recharts';
 
 export default function StatistiquesPage() {
   const [loading, setLoading] = useState(true);

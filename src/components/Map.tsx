@@ -116,7 +116,7 @@ export default function Map({ center = [8.6195, 1.1915], zoom = 7, filter = 'all
 
   useEffect(() => {
     async function fetchData() {
-      // Chargement des zones protégées
+      // Chargement initial des zones protégées
       if (filter === 'all' || filter === 'parks') {
         const { data: areaData } = await supabase.rpc('get_protected_areas_geojson');
         if (areaData) setAreas(areaData);
@@ -124,7 +124,7 @@ export default function Map({ center = [8.6195, 1.1915], zoom = 7, filter = 'all
         setAreas([]);
       }
 
-      // Chargement des observations vérifiées
+      // Chargement initial des observations vérifiées
       if (filter === 'all' || filter === 'species') {
         const { data: obsData } = await supabase.rpc('get_verified_observations_geojson');
         if (obsData) setObservations(obsData);
@@ -133,6 +133,22 @@ export default function Map({ center = [8.6195, 1.1915], zoom = 7, filter = 'all
       }
     }
     fetchData();
+
+    // ABONNEMENT TEMPS RÉEL
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'observations' },
+        () => {
+          fetchData(); // Rafraîchir les données dès qu'un changement survient
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [filter, supabase]);
 
   // Fonction pour convertir les coordonnées GeoJSON (Lng, Lat) en Leaflet (Lat, Lng)

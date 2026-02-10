@@ -65,6 +65,14 @@ export default function AdminPage() {
     checkAdmin();
   }, [router, supabase]);
 
+  const handleUpdateRole = async (userId: string, newRole: string) => {
+    const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+    if (!error) {
+      setStatus({ type: 'success', msg: "Rôle mis à jour avec succès !" });
+      fetchData();
+    }
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;

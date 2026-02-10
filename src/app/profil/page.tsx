@@ -19,28 +19,23 @@ export default function ProfilPage() {
   const [newRegion, setNewRegion] = useState('');
   
   const regions = ['Maritime', 'Plateaux', 'Centrale', 'Kara', 'Savanes'];
+  const router = useRouter();
+  const supabase = createClient();
 
   const fetchData = async () => {
-    // ...
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      router.push('/connexion');
+      return;
+    }
+
     const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     setProfile(profileData);
     setNewName(profileData?.full_name || '');
     setNewRegion(profileData?.region || '');
-    // ...
-  };
 
-  const handleUpdateProfile = async () => {
-    setUpdating(true);
-    const { error } = await supabase.from('profiles').update({ 
-      full_name: newName,
-      region: newRegion 
-    }).eq('id', profile.id);
-    if (!error) {
-      setIsEditing(false);
-      fetchData();
-    }
-    setUpdating(false);
-  };
+    const { data: obsData } = await supabase.from('observations').select('*, species:species_id(name)').eq('user_id', user.id).order('created_at', { ascending: false });
+    if (obsData) setObservations(obsData);
 
     const { data: badgeData } = await supabase.from('user_badges').select('*, badges(*)').eq('user_id', user.id);
     if (badgeData) setBadges(badgeData);
@@ -53,11 +48,14 @@ export default function ProfilPage() {
 
   useEffect(() => {
     fetchData();
-  }, [router, supabase]);
+  }, []);
 
   const handleUpdateProfile = async () => {
     setUpdating(true);
-    const { error } = await supabase.from('profiles').update({ full_name: newName }).eq('id', profile.id);
+    const { error } = await supabase.from('profiles').update({ 
+      full_name: newName,
+      region: newRegion 
+    }).eq('id', profile.id);
     if (!error) {
       setIsEditing(false);
       fetchData();
@@ -124,7 +122,7 @@ export default function ProfilPage() {
                   <select 
                     value={newRegion} 
                     onChange={(e) => setNewRegion(e.target.value)}
-                    className="bg-stone-50 border border-stone-200 rounded-lg px-3 py-1 text-xs font-bold text-stone-600 outline-none"
+                    className="bg-stone-50 border border-stone-200 rounded-lg px-3 py-1 text-xs font-bold text-stone-600 outline-none w-fit"
                   >
                     <option value="">Choisir ma région...</option>
                     {regions.map(r => <option key={r} value={r}>{r}</option>)}
