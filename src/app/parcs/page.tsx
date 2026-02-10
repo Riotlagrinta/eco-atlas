@@ -62,15 +62,15 @@ export default function ParcsPage() {
                 </div>
               </div>
               <p className="text-stone-500 text-sm mb-8 leading-relaxed line-clamp-3">
-                {area.description || "Aucune description détaillée disponible pour le moment. Aidez-nous à documenter ce parc en envoyant vos signalements."}
+                {area.description || "Aucune description détaillée disponible pour le moment."}
               </p>
               
               <div className="mt-auto pt-6 border-t border-stone-50 flex items-center justify-between">
                 <Link 
-                  href="/carte" 
+                  href={`/parcs/${area.id}`} 
                   className="flex items-center text-green-600 font-bold text-sm hover:translate-x-2 transition-all"
                 >
-                  Localiser sur la carte <ArrowRight className="ml-2 h-4 w-4" />
+                  Détails & Statistiques <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
                 <div className="flex -space-x-2 overflow-hidden">
                   {[1,2,3].map(i => (
