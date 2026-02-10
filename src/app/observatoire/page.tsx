@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Leaf, Search, AlertTriangle, Loader2, X } from 'lucide-react';
+import { Leaf, Search, AlertTriangle, Loader2, X, Share2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface Species {
@@ -74,8 +74,19 @@ export default function ObservatoirePage() {
                     <h2 className="text-3xl font-bold text-stone-900">{selectedSpecies.name}</h2>
                     <p className="text-lg italic text-green-600">{selectedSpecies.scientific_name}</p>
                   </div>
-                  <div className={`px-4 py-2 rounded-xl text-sm font-bold text-white ${statusColors[selectedSpecies.conservation_status]}`}>
-                    {statusLabels[selectedSpecies.conservation_status]}
+                  <div className="flex flex-col items-end gap-2">
+                    <div className={`px-4 py-2 rounded-xl text-sm font-bold text-white ${statusColors[selectedSpecies.conservation_status]}`}>
+                      {statusLabels[selectedSpecies.conservation_status]}
+                    </div>
+                    <button 
+                      onClick={() => {
+                        const text = `Découvrez le ${selectedSpecies.name} sur Eco-Atlas Togo 🇹🇬 : ${window.location.origin}/observatoire`;
+                        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+                      }}
+                      className="flex items-center text-[10px] font-bold text-green-600 bg-green-50 px-3 py-1.5 rounded-lg hover:bg-green-100 transition-all"
+                    >
+                      <Share2 className="h-3 w-3 mr-1" /> Partager sur WhatsApp
+                    </button>
                   </div>
                 </div>
 

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { Shield, Plus, Upload, Loader2, CheckCircle, AlertCircle, Trash2, Leaf, Film, Camera, Map as MapIcon, Newspaper, Save } from 'lucide-react';
+import { Shield, Plus, Upload, Loader2, CheckCircle, AlertCircle, Trash2, Leaf, Film, Camera, Map as MapIcon, Newspaper, Save, Users } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function AdminPage() {
@@ -13,33 +13,16 @@ export default function AdminPage() {
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
   
-  const [formData, setFormData] = useState({
-    name: '',
-    scientific_name: '',
-    description: '',
-    conservation_status: 'LC',
-    image_url: ''
-  });
-  const [docData, setDocData] = useState({
-    title: '',
-    description: '',
-    video_url: '',
-    thumbnail_url: '',
-    duration: '',
-    category: 'Nature'
-  });
-  const [articleData, setArticleData] = useState({
-    title: '',
-    content: '',
-    image_url: '',
-    category: 'Actualité'
-  });
+  const [formData, setFormData] = useState({ name: '', scientific_name: '', description: '', conservation_status: 'LC', image_url: '' });
+  const [docData, setDocData] = useState({ title: '', description: '', video_url: '', thumbnail_url: '', duration: '', category: 'Nature' });
+  const [articleData, setArticleData] = useState({ title: '', content: '', image_url: '', category: 'Actualité' });
 
   const [speciesList, setSpeciesList] = useState<any[]>([]);
   const [docList, setDocList] = useState<any[]>([]);
   const [obsList, setObsList] = useState<any[]>([]);
   const [articleList, setArticleList] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'species' | 'docs' | 'obs' | 'blog'>('species');
+  const [userList, setUserList] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'species' | 'docs' | 'obs' | 'blog' | 'users'>('species');
 
   const router = useRouter();
   const supabase = createClient();
@@ -56,6 +39,9 @@ export default function AdminPage() {
 
     const { data: arts } = await supabase.from('articles').select('*').order('created_at', { ascending: false });
     if (arts) setArticleList(arts);
+
+    const { data: users } = await supabase.from('profiles').select('*').order('updated_at', { ascending: false });
+    if (users) setUserList(users);
   };
 
   useEffect(() => {
@@ -76,6 +62,14 @@ export default function AdminPage() {
     }
     checkAdmin();
   }, [router, supabase]);
+
+  const handleUpdateRole = async (userId: string, newRole: string) => {
+    const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+    if (!error) {
+      setStatus({ type: 'success', msg: "Rôle mis à jour !" });
+      fetchData();
+    }
+  };
 
   const handleDeleteSpecies = async (id: string) => {
     if (!confirm("Supprimer cette espèce ?")) return;
@@ -196,7 +190,8 @@ export default function AdminPage() {
           { id: 'species', label: 'Espèces', icon: Leaf },
           { id: 'docs', label: 'Documentaires', icon: Film },
           { id: 'obs', label: 'Signalements', icon: Camera, badge: obsList.length },
-          { id: 'blog', label: 'Actualités', icon: Newspaper }
+          { id: 'blog', label: 'Actualités', icon: Newspaper },
+          { id: 'users', label: 'Membres', icon: Users }
         ].map((tab) => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-6 py-2.5 rounded-xl font-bold transition-all flex items-center ${activeTab === tab.id ? 'bg-green-600 text-white shadow-lg shadow-green-600/20' : 'bg-white text-stone-500 border border-stone-200 hover:bg-stone-50'}`}>
             <tab.icon className="h-4 w-4 mr-2" /> {tab.label} {tab.badge ? <span className="ml-2 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">{tab.badge}</span> : null}
@@ -239,6 +234,35 @@ export default function AdminPage() {
         </>
       )}
 
+      {activeTab === 'users' && (
+        <div className="space-y-6">
+          <h2 className="text-xl font-bold text-stone-900 flex items-center"><Users className="h-5 w-5 mr-2 text-green-600" /> Membres de la communauté</h2>
+          <div className="grid grid-cols-1 gap-4">
+            {userList.map(u => (
+              <div key={u.id} className="bg-white p-6 rounded-3xl border border-stone-100 flex items-center justify-between shadow-sm">
+                <div className="flex items-center space-x-4">
+                  <div className="w-12 h-12 bg-stone-100 rounded-full flex items-center justify-center font-bold text-green-600">{u.full_name?.charAt(0) || 'U'}</div>
+                  <div>
+                    <h3 className="font-bold text-stone-900">{u.full_name || 'Utilisateur anonyme'}</h3>
+                    <p className="text-xs text-stone-400 font-medium uppercase tracking-widest">{u.role}</p>
+                  </div>
+                </div>
+                <select 
+                  value={u.role} 
+                  onChange={(e) => handleUpdateRole(u.id, e.target.value)}
+                  className="bg-stone-50 border border-stone-200 rounded-xl px-4 py-2 text-xs font-bold outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="user">Utilisateur</option>
+                  <option value="expert">Expert</option>
+                  <option value="admin">Administrateur</option>
+                </select>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Reste des onglets (docs, obs, blog) conservés à l'identique */}
       {activeTab === 'docs' && (
         <>
           <div className="bg-white rounded-3xl shadow-xl border border-stone-100 p-8 mb-12">
