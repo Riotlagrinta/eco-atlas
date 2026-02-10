@@ -5,10 +5,23 @@ import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Camera, MapPin, Loader2, CheckCircle, AlertCircle, Send, Leaf } from 'lucide-react';
 import { motion } from 'framer-motion';
+import toast, { Toaster } from 'react-hot-toast';
 
 export default function SignalerPage() {
   const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
+  
+  useEffect(() => {
+    setIsOnline(navigator.onLine);
+    window.addEventListener('online', () => {
+      setIsOnline(true);
+      toast.success("Connexion rétablie !");
+    });
+    window.addEventListener('offline', () => {
+      setIsOnline(false);
+      toast.error("Mode hors-ligne activé.");
+    });
+  }, []);
   const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
   const [coords, setCoords] = useState<{ lat: number, lng: number } | null>(null);
   const [species, setSpecies] = useState<any[]>([]);
@@ -97,10 +110,10 @@ export default function SignalerPage() {
     ]);
 
     if (error) {
-      setStatus({ type: 'error', msg: error.message });
+      toast.error("Erreur : " + error.message);
     } else {
-      setStatus({ type: 'success', msg: "Merci ! Votre signalement a été envoyé et sera vérifié par un admin." });
-      setTimeout(() => router.push('/carte'), 3000);
+      toast.success(formData.type === 'alert' ? "ALERTE ENVOYÉE !" : "Observation envoyée avec succès !");
+      setTimeout(() => router.push('/carte'), 2000);
     }
     setLoading(false);
   };
@@ -208,6 +221,7 @@ export default function SignalerPage() {
           {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <><Send className="h-5 w-5" /><span>Envoyer le signalement</span></>}
         </button>
       </form>
+      <Toaster position="bottom-center" />
     </div>
   );
 }
