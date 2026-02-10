@@ -5,9 +5,38 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { LocateFixed } from 'lucide-react';
+import { LocateFixed, Search, Flame } from 'lucide-react';
+import { OpenStreetMapProvider, GeoSearchControl } from 'leaflet-geosearch';
+import 'leaflet-geosearch/dist/geosearch.css';
 
-const { BaseLayer } = LayersControl;
+const { BaseLayer, Overlay } = LayersControl;
+
+// Composant pour la recherche géographique
+function SearchField() {
+  const map = useMap();
+  useEffect(() => {
+    const provider = new OpenStreetMapProvider();
+    const searchControl = new (GeoSearchControl as any)({
+      provider,
+      style: 'bar',
+      showMarker: true,
+      showPopup: true,
+      autoClose: true,
+      retainZoomLevel: false,
+      animateZoom: true,
+      keepResult: true,
+      searchLabel: 'Rechercher un lieu au Togo...',
+    });
+
+    map.addControl(searchControl);
+    
+    return () => {
+      map.removeControl(searchControl);
+    };
+  }, [map]);
+
+  return null;
+}
 
 // Composant pour se localiser sur la carte
 function LocationButton() {
@@ -139,6 +168,15 @@ export default function Map({ center = [8.6195, 1.1915], zoom = 7, filter = 'all
             />
           </BaseLayer>
         </LayersControl>
+
+        <Overlay name="Alertes Incendies (NASA FIRMS)">
+          <TileLayer
+            attribution='&copy; NASA FIRMS'
+            url="https://firms.modaps.eosdis.nasa.gov/mapserver/wms/fires/global/?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&LAYERS=fires_24&STYLES=&FORMAT=image/png&TRANSPARENT=true&HEIGHT=256&WIDTH=256&SRS=EPSG:3857&BBOX={bbox-epsg-3857}"
+          />
+        </Overlay>
+        
+        <SearchField />
         
         {areas.map((area) => (
           <Polygon 

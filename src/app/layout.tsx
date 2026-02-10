@@ -16,6 +16,12 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Eco-Atlas | Observatoire de la Biodiversité",
   description: "Plateforme écologique hybride : observatoire des espèces en danger, cartographie géo-spatiale et écotourisme.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Eco-Atlas",
+  },
 };
 
 export default function RootLayout({

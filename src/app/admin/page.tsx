@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { Shield, Plus, Upload, Loader2, CheckCircle, AlertCircle, Trash2, Leaf, Film, Camera } from 'lucide-react';
+import { Shield, Plus, Upload, Loader2, CheckCircle, AlertCircle, Trash2, Leaf, Film, Camera, Map as MapIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function AdminPage() {
@@ -204,6 +205,12 @@ export default function AdminPage() {
           <h1 className="text-3xl font-bold text-stone-900">Panel Administrateur</h1>
           <p className="text-stone-500">Gestion de la biodiversité du Togo</p>
         </div>
+        <Link 
+          href="/admin/carte"
+          className="ml-auto bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold px-6 py-3 rounded-2xl flex items-center transition-all border border-stone-200"
+        >
+          <MapIcon className="h-5 w-5 mr-2" /> Éditeur SIG
+        </Link>
       </div>
 
       {status && (
