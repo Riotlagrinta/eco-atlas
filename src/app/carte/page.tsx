@@ -17,7 +17,22 @@ const Map = dynamic(() => import('@/components/Map'), {
 export default function CartePage() {
   const [activeFilter, setActiveFilter] = useState<'all' | 'parks' | 'species'>('all');
   const [recentObs, setRecentObs] = useState<any[]>([]);
+  const [nearby, setNearby] = useState<any>(null);
+  const [isScanning, setIsScanning] = useState(false);
   const supabase = createClient();
+
+  const scanNearby = () => {
+    setIsScanning(true);
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const { data } = await supabase.rpc('get_nearby_data', {
+        user_lat: pos.coords.latitude,
+        user_lng: pos.coords.longitude,
+        radius_meters: 50000 // 50km
+      });
+      setNearby(data);
+      setIsScanning(false);
+    });
+  };
 
   useEffect(() => {
     async function fetchRecent() {
@@ -42,6 +57,14 @@ export default function CartePage() {
           </h1>
           
           <div className="space-y-4">
+            <button 
+              onClick={scanNearby}
+              disabled={isScanning}
+              className="w-full py-3 bg-stone-900 text-white rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center justify-center hover:bg-green-600 transition-all shadow-lg"
+            >
+              {isScanning ? <Loader2 className="h-4 w-4 animate-spin" /> : <><MapIcon className="h-4 w-4 mr-2" /> Scanner autour de moi</>}
+            </button>
+
             <div className="flex flex-wrap gap-2">
               <button 
                 onClick={() => setActiveFilter('all')}
@@ -82,6 +105,21 @@ export default function CartePage() {
           <div className="space-y-4">
             <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Derniers signalements au Togo</h3>
             
+            {nearby && (
+              <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="p-4 bg-green-600 rounded-3xl text-white shadow-xl mb-6">
+                <h4 className="text-xs font-bold uppercase mb-4 flex items-center"><MapPin className="h-3 w-3 mr-1" /> À proximité (50km)</h4>
+                <div className="space-y-3">
+                  {nearby.observations?.map((o: any) => (
+                    <div key={o.id} className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg bg-white/20 overflow-hidden"><img src={o.image} className="w-full h-full object-cover" /></div>
+                      <span className="text-[10px] font-bold">{o.name} ({(o.dist/1000).toFixed(1)}km)</span>
+                    </div>
+                  ))}
+                  {!nearby.observations && <p className="text-[9px] opacity-70 italic">Aucune espèce proche détectée.</p>}
+                </div>
+              </motion.div>
+            )}
+
             {recentObs.length > 0 ? recentObs.map((obs) => (
               <div key={obs.id} className="flex items-center space-x-4 p-3 hover:bg-stone-50 rounded-2xl cursor-pointer transition-all border border-transparent hover:border-stone-100 group">
                 <div className="w-14 h-14 bg-stone-100 rounded-xl overflow-hidden flex-shrink-0 shadow-sm">
