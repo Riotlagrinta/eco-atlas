@@ -1,10 +1,12 @@
 'use client';
 
-import { MapContainer, TileLayer, Marker, Popup, Polygon } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polygon, LayersControl } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+
+const { BaseLayer } = LayersControl;
 
 // Fix for leaflet marker icons
 const DefaultIcon = L.icon({
@@ -73,10 +75,28 @@ export default function Map({ center = [8.6195, 1.1915], zoom = 7 }: MapProps) {
         scrollWheelZoom={true}
         className="h-full w-full"
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
+        <LayersControl position="topright">
+          <BaseLayer checked name="Forêt (Satellite)">
+            <TileLayer
+              attribution='&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EBP, and the GIS User Community'
+              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+            />
+          </BaseLayer>
+
+          <BaseLayer name="Relief & Topographie">
+            <TileLayer
+              attribution='&copy; <a href="https://opentopomap.org">OpenTopoMap</a> contributors'
+              url="https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png"
+            />
+          </BaseLayer>
+
+          <BaseLayer name="Carte Standard">
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+          </BaseLayer>
+        </LayersControl>
         
         {areas.map((area) => (
           <Polygon 
