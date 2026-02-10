@@ -2,8 +2,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Leaf, Search, AlertTriangle, Loader2, X, Share2 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Leaf, Search, AlertTriangle, Loader2, X, Share2, Heart } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface Species {
   id: string;
@@ -27,19 +27,39 @@ const statusLabels: Record<string, string> = {
 
 export default function ObservatoirePage() {
   const [species, setSpecies] = useState<Species[]>([]);
+  const [favorites, setFavorites] = useState<string[]>([]);
   const [selectedSpecies, setSelectedSpecies] = useState<Species | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const supabase = createClient();
 
   useEffect(() => {
-    async function fetchSpecies() {
-      const { data } = await supabase.from('species').select('*').order('name');
-      if (data) setSpecies(data);
+    async function fetchData() {
+      const { data: speciesData } = await supabase.from('species').select('*').order('name');
+      if (speciesData) setSpecies(speciesData);
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: favData } = await supabase.from('favorites').select('species_id').eq('user_id', user.id);
+        if (favData) setFavorites(favData.map(f => f.species_id));
+      }
       setLoading(false);
     }
-    fetchSpecies();
-  }, []);
+    fetchData();
+  }, [supabase]);
+
+  const toggleFavorite = async (speciesId: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return alert("Connectez-vous pour ajouter des favoris");
+
+    if (favorites.includes(speciesId)) {
+      await supabase.from('favorites').delete().eq('user_id', user.id).eq('species_id', speciesId);
+      setFavorites(favorites.filter(id => id !== speciesId));
+    } else {
+      await supabase.from('favorites').insert([{ user_id: user.id, species_id: speciesId }]);
+      setFavorites([...favorites, speciesId]);
+    }
+  };
 
   const filteredSpecies = species.filter(s => 
     s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -140,6 +160,16 @@ export default function ObservatoirePage() {
                 <div className="relative h-64 bg-stone-100">
                   <img src={s.image_url} alt={s.name} className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
                   <div className={`absolute top-4 right-4 px-3 py-1 rounded-full text-[10px] font-bold text-white uppercase ${statusColors[s.conservation_status]}`}>{s.conservation_status}</div>
+                  
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleFavorite(s.id);
+                    }}
+                    className="absolute bottom-4 right-4 w-10 h-10 bg-white/90 backdrop-blur shadow-lg rounded-full flex items-center justify-center hover:scale-110 transition-all"
+                  >
+                    <Heart className={`h-5 w-5 ${favorites.includes(s.id) ? 'text-red-500 fill-current' : 'text-stone-400'}`} />
+                  </button>
                 </div>
                 <div className="p-6">
                   <h3 className="text-xl font-bold text-stone-900 mb-1">{s.name}</h3>

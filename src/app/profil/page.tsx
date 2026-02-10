@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { User, Camera, CheckCircle, Clock, Award, Loader2, ArrowRight, MapPin, Settings, Upload, Save, X } from 'lucide-react';
+import { User, Camera, CheckCircle, Clock, Award, Loader2, ArrowRight, MapPin, Settings, Upload, Save, X, Heart, Leaf } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function ProfilPage() {
@@ -12,6 +12,8 @@ export default function ProfilPage() {
   const [profile, setProfile] = useState<any>(null);
   const [observations, setObservations] = useState<any[]>([]);
   const [badges, setBadges] = useState<any[]>([]);
+  const [favorites, setFavorites] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'obs' | 'favs'>('obs');
   const [isEditing, setIsEditing] = useState(false);
   const [newName, setNewName] = useState('');
   
@@ -34,6 +36,9 @@ export default function ProfilPage() {
 
     const { data: badgeData } = await supabase.from('user_badges').select('*, badges(*)').eq('user_id', user.id);
     if (badgeData) setBadges(badgeData);
+
+    const { data: favData } = await supabase.from('favorites').select('*, species(*)').eq('user_id', user.id);
+    if (favData) setFavorites(favData);
 
     setLoading(false);
   };
@@ -115,7 +120,7 @@ export default function ProfilPage() {
                   </button>
                 </div>
               )}
-              <p className="text-stone-500 flex items-center mt-1">
+              <p className="text-stone-500 flex items-center mt-1 text-sm">
                 <Award className="h-4 w-4 mr-2 text-green-600" /> {rank} du Togo
               </p>
             </div>
@@ -134,7 +139,6 @@ export default function ProfilPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
-        {/* Sidebar Info */}
         <div className="space-y-8">
           <div className="bg-white p-8 rounded-3xl border border-stone-100 shadow-sm text-center">
             <h3 className="font-bold text-stone-900 mb-6 flex items-center justify-center">
@@ -147,85 +151,73 @@ export default function ProfilPage() {
                     <Award className="h-8 w-8 text-green-600" />
                   </div>
                   <span className="text-[10px] font-bold text-stone-700 uppercase">{ub.badges?.name}</span>
-                  
-                  {/* Tooltip description */}
-                  <div className="absolute -top-12 scale-0 group-hover:scale-100 bg-stone-900 text-white text-[10px] p-2 rounded shadow-xl transition-all w-32 z-10">
-                    {ub.badges?.description}
-                  </div>
                 </div>
               ))}
-              
-              {badges.length === 0 && (
-                <div className="col-span-2 py-4 text-stone-400 text-xs italic">
-                  Continuez vos actions pour débloquer des badges !
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="bg-white p-8 rounded-3xl border border-stone-100 shadow-sm">
-            <h3 className="font-bold text-stone-900 mb-6 flex items-center">
-              <User className="h-5 w-5 mr-2 text-green-600" /> Informations
-            </h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">Rôle</label>
-                <p className="text-stone-700 font-medium capitalize">{profile?.role}</p>
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">Membre depuis</label>
-                <p className="text-stone-700 font-medium">
-                  {new Date(profile?.updated_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
-                </p>
-              </div>
+              {badges.length === 0 && <div className="col-span-2 py-4 text-stone-400 text-xs italic">Continuez vos actions pour débloquer des badges !</div>}
             </div>
           </div>
         </div>
 
-        {/* Historique Observations */}
         <div className="lg:col-span-2 space-y-6">
-          <h2 className="text-2xl font-bold text-stone-900 mb-6 flex items-center">
-            <Camera className="h-6 w-6 mr-3 text-green-600" /> Mes Signalements
-          </h2>
+          <div className="flex p-1 bg-stone-100 rounded-2xl mb-8 w-fit">
+            <button 
+              onClick={() => setActiveTab('obs')}
+              className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center ${activeTab === 'obs' ? 'bg-white text-green-600 shadow-sm' : 'text-stone-500'}`}
+            >
+              <Camera className="h-4 w-4 mr-2" /> Signalements
+            </button>
+            <button 
+              onClick={() => setActiveTab('favs')}
+              className={`px-6 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center ${activeTab === 'favs' ? 'bg-white text-red-600 shadow-sm' : 'text-stone-500'}`}
+            >
+              <Heart className="h-4 w-4 mr-2" /> Ma Nature
+            </button>
+          </div>
 
-          <div className="grid grid-cols-1 gap-4">
-            {observations.map((obs) => (
-              <div key={obs.id} className="bg-white p-4 rounded-2xl border border-stone-100 shadow-sm flex items-center justify-between group hover:shadow-md transition-all">
-                <div className="flex items-center space-x-4">
-                  <div className="w-16 h-16 rounded-xl overflow-hidden bg-stone-100 flex-shrink-0">
-                    <img src={obs.image_url || 'https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=100&q=80'} className="w-full h-full object-cover" alt="Obs" />
-                  </div>
-                  <div>
-                    <h4 className="font-bold text-stone-900">{obs.species?.name || "Espèce inconnue"}</h4>
-                    <p className="text-xs text-stone-500 line-clamp-1">{obs.description}</p>
-                    <div className="flex items-center mt-1 text-[10px] font-bold uppercase tracking-wider">
-                      {obs.is_verified ? (
-                        <span className="text-green-600 flex items-center"><CheckCircle className="h-3 w-3 mr-1" /> Validé</span>
-                      ) : (
-                        <span className="text-amber-500 flex items-center"><Clock className="h-3 w-3 mr-1" /> En attente</span>
-                      )}
+          {activeTab === 'obs' ? (
+            <div className="grid grid-cols-1 gap-4">
+              {observations.map((obs) => (
+                <div key={obs.id} className="bg-white p-4 rounded-2xl border border-stone-100 shadow-sm flex items-center justify-between group">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-16 h-16 rounded-xl overflow-hidden bg-stone-100 flex-shrink-0">
+                      <img src={obs.image_url} className="w-full h-full object-cover" alt="Obs" />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-stone-900">{obs.species?.name || "Espèce inconnue"}</h4>
+                      <div className="flex items-center mt-1 text-[10px] font-bold uppercase tracking-wider">
+                        {obs.is_verified ? <span className="text-green-600 flex items-center"><CheckCircle className="h-3 w-3 mr-1" /> Validé</span> : <span className="text-amber-500 flex items-center"><Clock className="h-3 w-3 mr-1" /> En attente</span>}
+                      </div>
                     </div>
                   </div>
+                  <ArrowRight className="h-5 w-5 text-stone-300 group-hover:text-green-600 transition-colors" />
                 </div>
-                <div className="p-2 text-stone-300 group-hover:text-green-600 transition-colors">
-                  <ArrowRight className="h-5 w-5" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+              {favorites.map((fav) => (
+                <div key={fav.id} className="bg-white rounded-3xl border border-stone-100 overflow-hidden shadow-sm hover:shadow-md transition-all">
+                  <div className="relative h-40 bg-stone-100">
+                    <img src={fav.species?.image_url} className="w-full h-full object-cover" alt="Fav" />
+                    <div className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur rounded-full text-red-500">
+                      <Heart className="h-4 w-4 fill-current" />
+                    </div>
+                  </div>
+                  <div className="p-4">
+                    <h4 className="font-bold text-stone-900">{fav.species?.name}</h4>
+                    <p className="text-xs text-stone-500 italic mb-3">{fav.species?.scientific_name}</p>
+                    <button onClick={() => router.push('/observatoire')} className="text-[10px] font-bold text-green-600 uppercase tracking-widest hover:underline">Voir la fiche</button>
+                  </div>
                 </div>
-              </div>
-            ))}
-
-            {observations.length === 0 && (
-              <div className="text-center py-20 bg-stone-50 rounded-3xl border-2 border-dashed border-stone-200">
-                <Camera className="h-12 w-12 text-stone-300 mx-auto mb-4" />
-                <p className="text-stone-500 font-medium">Vous n'avez pas encore envoyé de signalement.</p>
-                <button 
-                  onClick={() => router.push('/signaler')}
-                  className="mt-4 text-green-600 font-bold hover:underline"
-                >
-                  Commencer maintenant →
-                </button>
-              </div>
-            )}
-          </div>
+              ))}
+              {favorites.length === 0 && (
+                <div className="col-span-full text-center py-20 bg-stone-50 rounded-3xl border-2 border-dashed border-stone-200">
+                  <Heart className="h-12 w-12 text-stone-300 mx-auto mb-4" />
+                  <p className="text-stone-500 font-medium">Vous n'avez pas encore d'espèces favorites.</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
