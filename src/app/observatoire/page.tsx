@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Leaf, Search, AlertTriangle, Loader2, X, Share2, Heart } from 'lucide-react';
+import { Leaf, Search, AlertTriangle, Loader2, X, Share2, Heart, MessageSquare, Send, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface Species {
@@ -29,9 +29,20 @@ export default function ObservatoirePage() {
   const [species, setSpecies] = useState<Species[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [selectedSpecies, setSelectedSpecies] = useState<Species | null>(null);
+  const [comments, setComments] = useState<any[]>([]);
+  const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const supabase = createClient();
+
+  const fetchComments = async (speciesId: string) => {
+    const { data } = await supabase
+      .from('comments')
+      .select('*, profiles(full_name, avatar_url)')
+      .eq('species_id', speciesId)
+      .order('created_at', { ascending: true });
+    if (data) setComments(data);
+  };
 
   useEffect(() => {
     async function fetchData() {
@@ -61,6 +72,24 @@ export default function ObservatoirePage() {
     }
   };
 
+  const handleSendComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newComment.trim()) return;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return alert("Connectez-vous pour commenter !");
+    
+    const { error } = await supabase.from('comments').insert([{
+      user_id: user.id,
+      species_id: selectedSpecies?.id,
+      content: newComment
+    }]);
+
+    if (!error) {
+      setNewComment('');
+      fetchComments(selectedSpecies!.id);
+    }
+  };
+
   const filteredSpecies = species.filter(s => 
     s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.scientific_name?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -70,67 +99,95 @@ export default function ObservatoirePage() {
     <div className="min-h-screen bg-white text-stone-900 px-4 py-12">
       <div className="max-w-7xl mx-auto">
         
-        {/* Modal Détail - Fond Clair */}
-        {selectedSpecies && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-100/90 backdrop-blur-md">
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl relative border border-stone-200"
-            >
-              <div className="relative h-64 md:h-96">
-                <img src={selectedSpecies.image_url} className="w-full h-full object-cover" alt={selectedSpecies.name} />
-                <button 
-                  onClick={() => setSelectedSpecies(null)}
-                  className="absolute top-4 right-4 bg-white shadow-lg text-stone-900 p-2 rounded-full hover:bg-stone-100 transition-all"
-                >
-                  <X className="h-6 w-6" />
-                </button>
-              </div>
-              
-              <div className="p-8">
-                <div className="flex flex-col md:flex-row justify-between items-start mb-6 gap-4">
-                  <div>
-                    <h2 className="text-3xl font-bold text-stone-900">{selectedSpecies.name}</h2>
-                    <p className="text-lg italic text-green-600">{selectedSpecies.scientific_name}</p>
-                  </div>
-                  <div className="flex flex-col items-end gap-2">
-                    <div className={`px-4 py-2 rounded-xl text-sm font-bold text-white ${statusColors[selectedSpecies.conservation_status]}`}>
-                      {statusLabels[selectedSpecies.conservation_status]}
+        {/* Modal Détail */}
+        <AnimatePresence>
+          {selectedSpecies && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-100/90 backdrop-blur-md">
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl relative border border-stone-200"
+              >
+                <div className="relative h-64 md:h-96">
+                  <img src={selectedSpecies.image_url} className="w-full h-full object-cover" alt={selectedSpecies.name} />
+                  <button onClick={() => setSelectedSpecies(null)} className="absolute top-4 right-4 bg-white shadow-lg text-stone-900 p-2 rounded-full hover:bg-stone-100 transition-all"><X className="h-6 w-6" /></button>
+                </div>
+                
+                <div className="p-8">
+                  <div className="flex flex-col md:flex-row justify-between items-start mb-6 gap-4">
+                    <div>
+                      <h2 className="text-3xl font-bold text-stone-900">{selectedSpecies.name}</h2>
+                      <p className="text-lg italic text-green-600">{selectedSpecies.scientific_name}</p>
                     </div>
-                    <button 
-                      onClick={() => {
-                        const text = `Découvrez le ${selectedSpecies.name} sur Eco-Atlas Togo 🇹🇬 : ${window.location.origin}/observatoire`;
-                        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
-                      }}
-                      className="flex items-center text-[10px] font-bold text-green-600 bg-green-50 px-3 py-1.5 rounded-lg hover:bg-green-100 transition-all"
-                    >
-                      <Share2 className="h-3 w-3 mr-1" /> Partager sur WhatsApp
-                    </button>
+                    <div className="flex flex-col items-end gap-2">
+                      <div className={`px-4 py-2 rounded-xl text-sm font-bold text-white ${statusColors[selectedSpecies.conservation_status]}`}>
+                        {statusLabels[selectedSpecies.conservation_status]}
+                      </div>
+                      <button 
+                        onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent("Découvrez le " + selectedSpecies.name + " sur Eco-Atlas Togo 🇹🇬")}`, '_blank')}
+                        className="flex items-center text-[10px] font-bold text-green-600 bg-green-50 px-3 py-1.5 rounded-lg hover:bg-green-100 transition-all"
+                      >
+                        <Share2 className="h-3 w-3 mr-1" /> WhatsApp
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    {[
+                      { label: 'Habitat', value: selectedSpecies.habitat },
+                      { label: 'Régime', value: selectedSpecies.diet },
+                      { label: 'Population', value: selectedSpecies.population_estimate }
+                    ].map((item, i) => (
+                      <div key={i} className="bg-stone-50 p-4 rounded-2xl border border-stone-100">
+                        <h4 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">{item.label}</h4>
+                        <p className="text-sm font-bold text-stone-700">{item.value || "Non renseigné"}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <p className="text-stone-600 leading-relaxed whitespace-pre-wrap mb-12 border-b border-stone-100 pb-12">{selectedSpecies.description}</p>
+
+                  {/* Section Discussion */}
+                  <div className="bg-stone-50 p-8 rounded-3xl">
+                    <h3 className="text-xl font-bold text-stone-900 mb-8 flex items-center">
+                      <MessageSquare className="h-5 w-5 mr-2 text-green-600" /> Discussion ({comments.length})
+                    </h3>
+
+                    <div className="space-y-6 mb-8">
+                      {comments.map((c) => (
+                        <div key={c.id} className="flex space-x-4">
+                          <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-stone-200 overflow-hidden flex-shrink-0">
+                            {c.profiles?.avatar_url ? <img src={c.profiles.avatar_url} className="w-full h-full object-cover" /> : <User className="h-5 w-5 text-stone-300" />}
+                          </div>
+                          <div className="flex-1">
+                            <div className="bg-white p-4 rounded-2xl border border-stone-100 shadow-sm">
+                              <p className="font-bold text-xs text-stone-900 mb-1">{c.profiles?.full_name || "Éco-citoyen"}</p>
+                              <p className="text-sm text-stone-600">{c.content}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <form onSubmit={handleSendComment} className="relative">
+                      <input 
+                        type="text" 
+                        placeholder="Une question ? Une observation ?" 
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        className="w-full pl-6 pr-12 py-4 bg-white border border-stone-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 shadow-sm"
+                      />
+                      <button type="submit" className="absolute right-3 top-3 p-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-all">
+                        <Send className="h-4 w-4" />
+                      </button>
+                    </form>
                   </div>
                 </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                  {[
-                    { label: 'Habitat', value: selectedSpecies.habitat },
-                    { label: 'Régime', value: selectedSpecies.diet },
-                    { label: 'Population', value: selectedSpecies.population_estimate }
-                  ].map((item, i) => (
-                    <div key={i} className="bg-stone-50 p-4 rounded-2xl border border-stone-100">
-                      <h4 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">{item.label}</h4>
-                      <p className="text-sm font-bold text-stone-700">{item.value || "Non renseigné"}</p>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="prose prose-stone max-w-none">
-                  <h4 className="text-lg font-bold mb-2 text-stone-900">Description et Conservation</h4>
-                  <p className="text-stone-600 leading-relaxed whitespace-pre-wrap">{selectedSpecies.description}</p>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
 
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
           <div>
@@ -174,7 +231,15 @@ export default function ObservatoirePage() {
                 <div className="p-6">
                   <h3 className="text-xl font-bold text-stone-900 mb-1">{s.name}</h3>
                   <p className="text-sm italic text-stone-500 mb-4">{s.scientific_name}</p>
-                  <button onClick={() => setSelectedSpecies(s)} className="w-full py-3 bg-stone-900 text-white font-bold rounded-xl hover:bg-green-600 transition-colors">Voir la fiche</button>
+                  <button 
+                    onClick={() => {
+                      setSelectedSpecies(s);
+                      fetchComments(s.id);
+                    }} 
+                    className="w-full py-3 bg-stone-900 text-white font-bold rounded-xl hover:bg-green-600 transition-colors"
+                  >
+                    Voir la fiche
+                  </button>
                 </div>
               </div>
             ))}

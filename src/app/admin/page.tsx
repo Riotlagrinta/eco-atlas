@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { Shield, Plus, Upload, Loader2, CheckCircle, AlertCircle, Trash2, Leaf, Film, Camera, Map as MapIcon, Newspaper, Save, Users } from 'lucide-react';
+import { Shield, Plus, Upload, Loader2, CheckCircle, AlertCircle, Trash2, Leaf, Film, Camera, Map as MapIcon, Newspaper, Save, Users, Target } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function AdminPage() {
@@ -16,13 +16,15 @@ export default function AdminPage() {
   const [formData, setFormData] = useState({ name: '', scientific_name: '', description: '', conservation_status: 'LC', image_url: '' });
   const [docData, setDocData] = useState({ title: '', description: '', video_url: '', thumbnail_url: '', duration: '', category: 'Nature' });
   const [articleData, setArticleData] = useState({ title: '', content: '', image_url: '', category: 'Actualité' });
+  const [missionData, setMissionData] = useState({ title: '', description: '', target_count: 10, image_url: '', end_date: '' });
 
   const [speciesList, setSpeciesList] = useState<any[]>([]);
   const [docList, setDocList] = useState<any[]>([]);
   const [obsList, setObsList] = useState<any[]>([]);
   const [articleList, setArticleList] = useState<any[]>([]);
   const [userList, setUserList] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'species' | 'docs' | 'obs' | 'blog' | 'users'>('species');
+  const [missionList, setMissionList] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<'species' | 'docs' | 'obs' | 'blog' | 'users' | 'missions'>('species');
 
   const router = useRouter();
   const supabase = createClient();
@@ -42,6 +44,9 @@ export default function AdminPage() {
 
     const { data: users } = await supabase.from('profiles').select('*').order('updated_at', { ascending: false });
     if (users) setUserList(users);
+
+    const { data: miss } = await supabase.from('missions').select('*').order('created_at', { ascending: false });
+    if (miss) setMissionList(miss);
   };
 
   useEffect(() => {
@@ -141,6 +146,24 @@ export default function AdminPage() {
     if (!error) fetchData();
   };
 
+  const handleSubmitMission = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    const { error } = await supabase.from('missions').insert([missionData]);
+    if (!error) {
+      setStatus({ type: 'success', msg: "Mission lancée !" });
+      setMissionData({ title: '', description: '', target_count: 10, image_url: '', end_date: '' });
+      fetchData();
+    }
+    setLoading(false);
+  };
+
+  const handleDeleteMission = async (id: string) => {
+    if (!confirm("Supprimer cette mission ?")) return;
+    const { error } = await supabase.from('missions').delete().eq('id', id);
+    if (!error) fetchData();
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -191,7 +214,8 @@ export default function AdminPage() {
           { id: 'docs', label: 'Documentaires', icon: Film },
           { id: 'obs', label: 'Signalements', icon: Camera, badge: obsList.length },
           { id: 'blog', label: 'Actualités', icon: Newspaper },
-          { id: 'users', label: 'Membres', icon: Users }
+          { id: 'users', label: 'Membres', icon: Users },
+          { id: 'missions', label: 'Missions', icon: Target }
         ].map((tab) => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`px-6 py-2.5 rounded-xl font-bold transition-all flex items-center ${activeTab === tab.id ? 'bg-green-600 text-white shadow-lg shadow-green-600/20' : 'bg-white text-stone-500 border border-stone-200 hover:bg-stone-50'}`}>
             <tab.icon className="h-4 w-4 mr-2" /> {tab.label} {tab.badge ? <span className="ml-2 bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">{tab.badge}</span> : null}
@@ -262,7 +286,6 @@ export default function AdminPage() {
         </div>
       )}
 
-      {/* Reste des onglets (docs, obs, blog) conservés à l'identique */}
       {activeTab === 'docs' && (
         <>
           <div className="bg-white rounded-3xl shadow-xl border border-stone-100 p-8 mb-12">
@@ -321,6 +344,34 @@ export default function AdminPage() {
               <div key={a.id} className="bg-white p-4 rounded-2xl border border-stone-100 flex items-center justify-between shadow-sm">
                 <h3 className="font-bold">{a.title}</h3>
                 <button onClick={() => handleDeleteArticle(a.id)} className="p-2 text-stone-300 hover:text-red-600"><Trash2 className="h-5 w-5" /></button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {activeTab === 'missions' && (
+        <>
+          <div className="bg-white rounded-3xl shadow-xl border border-stone-100 p-8 mb-12">
+            <h2 className="text-xl font-bold text-stone-900 mb-8 flex items-center"><Plus className="h-5 w-5 mr-2 text-green-600" /> Nouvelle Mission Vert</h2>
+            <form onSubmit={handleSubmitMission} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <input type="text" placeholder="Titre de la mission" required value={missionData.title} onChange={(e) => setMissionData({...missionData, title: e.target.value})} className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl outline-none" />
+                <input type="number" placeholder="Objectif (nb signalements)" required value={missionData.target_count} onChange={(e) => setMissionData({...missionData, target_count: parseInt(e.target.value)})} className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl outline-none" />
+              </div>
+              <textarea placeholder="Description de la mission" rows={3} value={missionData.description} onChange={(e) => setMissionData({...missionData, description: e.target.value})} className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl outline-none"></textarea>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <input type="text" placeholder="URL Image" value={missionData.image_url} onChange={(e) => setMissionData({...missionData, image_url: e.target.value})} className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl" />
+                <input type="date" required value={missionData.end_date} onChange={(e) => setMissionData({...missionData, end_date: e.target.value})} className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-xl" />
+              </div>
+              <button type="submit" disabled={loading} className="w-full bg-green-600 text-white font-bold py-4 rounded-xl shadow-lg">Lancer la mission</button>
+            </form>
+          </div>
+          <div className="grid grid-cols-1 gap-4">
+            {missionList.map(m => (
+              <div key={m.id} className="bg-white p-4 rounded-2xl border border-stone-100 flex items-center justify-between shadow-sm">
+                <div className="flex items-center space-x-4"><img src={m.image_url} className="w-12 h-12 rounded-xl object-cover" /><h3 className="font-bold">{m.title}</h3></div>
+                <button onClick={() => handleDeleteMission(m.id)} className="p-2 text-stone-300 hover:text-red-600"><Trash2 className="h-5 w-5" /></button>
               </div>
             ))}
           </div>
