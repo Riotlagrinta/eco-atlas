@@ -8,7 +8,7 @@ import { motion } from 'framer-motion';
 
 export default function ProfilPage() {
   const [loading, setLoading] = useState(true);
-  const [updating, setUploading] = useState(false);
+  const [updating, setUpdating] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [observations, setObservations] = useState<any[]>([]);
   const [badges, setBadges] = useState<any[]>([]);

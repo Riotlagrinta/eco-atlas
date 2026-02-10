@@ -148,8 +148,11 @@ export default function StatistiquesPage() {
             </div>
           </div>
           
-          <button className="w-full mt-12 py-4 bg-stone-900 text-white font-bold rounded-2xl hover:bg-stone-800 transition-all">
-            Télécharger le rapport PDF
+          <button 
+            onClick={() => window.print()}
+            className="w-full mt-12 py-4 bg-stone-900 text-white font-bold rounded-2xl hover:bg-stone-800 transition-all flex items-center justify-center"
+          >
+            <ShieldCheck className="h-5 w-5 mr-2" /> Générer le Bilan Officiel
           </button>
         </div>
       </div>
