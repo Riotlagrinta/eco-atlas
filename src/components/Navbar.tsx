@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, X, Leaf, Map, Film, Info, Camera, Shield, User } from 'lucide-react';
+import { Menu, X, Leaf, Map, Film, Info, Camera, Shield, User, Newspaper } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createClient } from '@/lib/supabase/client';
 
@@ -10,8 +10,8 @@ const navItems = [
   { name: 'Observatoire', href: '/observatoire', icon: Leaf },
   { name: 'Carte', href: '/carte', icon: Map },
   { name: 'Documentaires', href: '/documentaires', icon: Film },
+  { name: 'Actualités', href: '/actualites', icon: Newspaper },
   { name: 'Statistiques', href: '/statistiques', icon: Info },
-  { name: 'À propos', href: '/a-propos', icon: Info },
 ];
 
 export function Navbar() {
