@@ -16,23 +16,31 @@ export default function ProfilPage() {
   const [activeTab, setActiveTab] = useState<'obs' | 'favs'>('obs');
   const [isEditing, setIsEditing] = useState(false);
   const [newName, setNewName] = useState('');
+  const [newRegion, setNewRegion] = useState('');
   
-  const router = useRouter();
-  const supabase = createClient();
+  const regions = ['Maritime', 'Plateaux', 'Centrale', 'Kara', 'Savanes'];
 
   const fetchData = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      router.push('/connexion');
-      return;
-    }
-
+    // ...
     const { data: profileData } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     setProfile(profileData);
     setNewName(profileData?.full_name || '');
+    setNewRegion(profileData?.region || '');
+    // ...
+  };
 
-    const { data: obsData } = await supabase.from('observations').select('*, species:species_id(name)').eq('user_id', user.id).order('created_at', { ascending: false });
-    if (obsData) setObservations(obsData);
+  const handleUpdateProfile = async () => {
+    setUpdating(true);
+    const { error } = await supabase.from('profiles').update({ 
+      full_name: newName,
+      region: newRegion 
+    }).eq('id', profile.id);
+    if (!error) {
+      setIsEditing(false);
+      fetchData();
+    }
+    setUpdating(false);
+  };
 
     const { data: badgeData } = await supabase.from('user_badges').select('*, badges(*)').eq('user_id', user.id);
     if (badgeData) setBadges(badgeData);
@@ -98,26 +106,43 @@ export default function ProfilPage() {
             </div>
             <div className="flex-1">
               {isEditing ? (
-                <div className="flex items-center gap-2">
-                  <input 
-                    type="text" 
-                    value={newName} 
-                    onChange={(e) => setNewName(e.target.value)}
-                    className="text-2xl font-bold text-stone-900 border-b-2 border-green-500 bg-transparent outline-none py-1"
-                  />
-                  <button onClick={handleUpdateProfile} disabled={updating} className="p-2 text-green-600 hover:bg-green-50 rounded-full transition-all">
-                    {updating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-                  </button>
-                  <button onClick={() => setIsEditing(false)} className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-all">
-                    <X className="h-5 w-5" />
-                  </button>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="text" 
+                      value={newName} 
+                      onChange={(e) => setNewName(e.target.value)}
+                      className="text-2xl font-bold text-stone-900 border-b-2 border-green-500 bg-transparent outline-none py-1"
+                    />
+                    <button onClick={handleUpdateProfile} disabled={updating} className="p-2 text-green-600 hover:bg-green-50 rounded-full transition-all">
+                      {updating ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
+                    </button>
+                    <button onClick={() => setIsEditing(false)} className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-all">
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                  <select 
+                    value={newRegion} 
+                    onChange={(e) => setNewRegion(e.target.value)}
+                    className="bg-stone-50 border border-stone-200 rounded-lg px-3 py-1 text-xs font-bold text-stone-600 outline-none"
+                  >
+                    <option value="">Choisir ma région...</option>
+                    {regions.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
                 </div>
               ) : (
-                <div className="flex items-center gap-3">
-                  <h1 className="text-3xl font-bold text-stone-900">{profile?.full_name || "Éco-citoyen"}</h1>
-                  <button onClick={() => setIsEditing(true)} className="p-2 text-stone-400 hover:text-green-600 transition-all">
-                    <Settings className="h-5 w-5" />
-                  </button>
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-3">
+                    <h1 className="text-3xl font-bold text-stone-900">{profile?.full_name || "Éco-citoyen"}</h1>
+                    <button onClick={() => setIsEditing(true)} className="p-2 text-stone-400 hover:text-green-600 transition-all">
+                      <Settings className="h-5 w-5" />
+                    </button>
+                  </div>
+                  {profile?.region && (
+                    <p className="text-xs font-bold text-stone-400 uppercase tracking-widest flex items-center">
+                      <MapPin className="h-3 w-3 mr-1" /> Région {profile.region}
+                    </p>
+                  )}
                 </div>
               )}
               <p className="text-stone-500 flex items-center mt-1 text-sm">
