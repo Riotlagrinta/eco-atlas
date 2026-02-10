@@ -1,12 +1,38 @@
 'use client';
 
-import { MapContainer, TileLayer, Marker, Popup, Polygon, LayersControl, Tooltip } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polygon, LayersControl, Tooltip, ScaleControl, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { LocateFixed } from 'lucide-react';
 
 const { BaseLayer } = LayersControl;
+
+// Composant pour se localiser sur la carte
+function LocationButton() {
+  const map = useMap();
+  const [loading, setLoading] = useState(false);
+
+  const handleClick = () => {
+    setLoading(true);
+    map.locate().on('locationfound', (e) => {
+      map.flyTo(e.latlng, 16);
+      setLoading(false);
+      L.marker(e.latlng).addTo(map).bindPopup("Vous êtes ici").openPopup();
+    });
+  };
+
+  return (
+    <button 
+      onClick={handleClick}
+      className="absolute bottom-24 right-6 z-[1000] bg-white p-3 rounded-full shadow-2xl border border-stone-200 hover:bg-stone-50 transition-all group"
+      title="Ma position exacte"
+    >
+      <LocateFixed className={`h-6 w-6 ${loading ? 'text-blue-500 animate-pulse' : 'text-stone-600 group-hover:text-green-600'}`} />
+    </button>
+  );
+}
 
 // Fix for leaflet marker icons
 const DefaultIcon = L.icon({
@@ -85,9 +111,16 @@ export default function Map({ center = [8.6195, 1.1915], zoom = 7, filter = 'all
         className="h-full w-full"
       >
         <LayersControl position="topright">
-          <BaseLayer checked name="Forêt (Satellite)">
+          <BaseLayer checked name="Haute Précision (Google)">
             <TileLayer
-              attribution='&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EBP, and the GIS User Community'
+              attribution='&copy; Google'
+              url="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+            />
+          </BaseLayer>
+
+          <BaseLayer name="Forêt (Esri)">
+            <TileLayer
+              attribution='&copy; Esri'
               url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
             />
           </BaseLayer>
@@ -145,6 +178,8 @@ export default function Map({ center = [8.6195, 1.1915], zoom = 7, filter = 'all
             </Popup>
           </Marker>
         ))}
+        <ScaleControl position="bottomleft" imperial={false} />
+        <LocationButton />
       </MapContainer>
     </div>
   );
