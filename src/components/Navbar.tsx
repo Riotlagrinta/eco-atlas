@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, X, Leaf, Map, Film, Info } from 'lucide-react';
+import { Menu, X, Leaf, Map, Film, Info, Camera, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { createClient } from '@/lib/supabase/client';
 
 const navItems = [
   { name: 'Observatoire', href: '/observatoire', icon: Leaf },
@@ -14,6 +15,33 @@ const navItems = [
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const supabase = createClient();
+
+  useEffect(() => {
+    const checkUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUser(user);
+
+      if (user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        if (profile?.role === 'admin') setIsAdmin(true);
+      }
+    };
+    checkUser();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      if (!session) setIsAdmin(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase]);
 
   return (
     <nav className="fixed top-0 w-full z-50 bg-white/80 backdrop-blur-md border-b border-green-100 shadow-sm">
@@ -29,23 +57,53 @@ export function Navbar() {
           </div>
 
           {/* Desktop Nav */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden md:flex items-center space-x-6">
             {navItems.map((item) => (
               <Link
                 key={item.name}
                 href={item.href}
-                className="text-gray-600 hover:text-green-600 transition-colors font-medium flex items-center space-x-1"
+                className="text-gray-600 hover:text-green-600 transition-colors font-medium flex items-center space-x-1 text-sm"
               >
                 <item.icon className="h-4 w-4" />
                 <span>{item.name}</span>
               </Link>
             ))}
-            <Link
-              href="/connexion"
-              className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-full font-bold text-sm transition-all shadow-md hover:shadow-green-500/20"
-            >
-              Connexion
-            </Link>
+            
+            {user && (
+              <Link
+                href="/signaler"
+                className="text-emerald-600 hover:text-emerald-700 transition-colors font-bold flex items-center space-x-1 text-sm bg-emerald-50 px-3 py-1.5 rounded-lg"
+              >
+                <Camera className="h-4 w-4" />
+                <span>Signaler</span>
+              </Link>
+            )}
+
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className="text-stone-600 hover:text-stone-900 transition-colors font-bold flex items-center space-x-1 text-sm"
+              >
+                <Shield className="h-4 w-4" />
+                <span>Admin</span>
+              </Link>
+            )}
+
+            {!user ? (
+              <Link
+                href="/connexion"
+                className="bg-green-600 hover:bg-green-700 text-white px-5 py-2 rounded-full font-bold text-sm transition-all shadow-md hover:shadow-green-500/20"
+              >
+                Connexion
+              </Link>
+            ) : (
+              <button 
+                onClick={() => supabase.auth.signOut()}
+                className="text-stone-400 hover:text-red-500 transition-colors text-sm font-medium"
+              >
+                Déconnexion
+              </button>
+            )}
           </div>
 
           {/* Mobile menu button */}
