@@ -6,6 +6,7 @@ import { Leaf, Search, AlertTriangle, Loader2, X, Share2, Heart, MessageSquare, 
 import { motion, AnimatePresence } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 
 const MiniMap = dynamic(() => import('@/components/Map'), { 
   ssr: false, 
@@ -176,11 +177,17 @@ function ObservatoireContent() {
                 <div className={`absolute top-4 right-4 px-3 py-1 rounded-full text-[10px] font-bold text-white uppercase ${statusColors[s.conservation_status]}`}>{s.conservation_status}</div>
                 <button onClick={(e) => { e.stopPropagation(); toggleFavorite(s.id); }} className="absolute bottom-4 right-4 w-10 h-10 bg-white/90 backdrop-blur shadow-lg rounded-full flex items-center justify-center hover:scale-110 transition-all"><Heart className={`h-5 w-5 ${favorites.includes(s.id) ? 'text-red-500 fill-current' : 'text-stone-400'}`} /></button>
               </div>
-              <div className="p-6">
-                <h3 className="text-xl font-bold text-stone-900 mb-1">{s.name}</h3>
-                <p className="text-sm italic text-stone-500 mb-4">{s.scientific_name}</p>
-                <button onClick={() => { setSelectedSpecies(s); fetchComments(s.id); }} className="w-full py-3 bg-stone-900 text-white font-bold rounded-xl hover:bg-green-600 transition-colors">Voir la fiche</button>
-              </div>
+                              <div className="p-6">
+                                <h3 className="text-xl font-bold text-stone-900 mb-1">{s.name}</h3>
+                                <p className="text-sm italic text-stone-500 mb-4">{s.scientific_name}</p>
+                                <Link 
+                                  href={`/observatoire/${s.id}`}
+                                  className="block w-full py-3 bg-stone-900 text-white font-bold rounded-xl hover:bg-green-600 transition-colors text-center"
+                                >
+                                  Voir la fiche
+                                </Link>
+                              </div>
+              
             </div>
           ))}
         </div>
