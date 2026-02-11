@@ -6,11 +6,13 @@ import { createClient } from '@/lib/supabase/client';
 import { Camera, MapPin, Loader2, CheckCircle, AlertCircle, Send, Leaf } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
+import { db } from '@/lib/offline-db';
 
 export default function SignalerPage() {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+  // ... rest
   
   useEffect(() => {
     setIsOnline(navigator.onLine);
@@ -97,18 +99,34 @@ export default function SignalerPage() {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
 
-    const { error } = await supabase.from('observations').insert([
-      {
-        user_id: user?.id,
-        species_id: formData.type === 'observation' ? (formData.species_id || null) : null,
-        description: formData.description,
-        image_url: formData.image_url,
-        location: `POINT(${coords.lng} ${coords.lat})`,
-        is_verified: formData.type === 'alert' ? true : false, // Les alertes sont visibles immédiatement pour la sécurité
-        type: formData.type,
-        alert_level: formData.alert_level
-      }
-    ]);
+    const reportData = {
+      user_id: user?.id,
+      species_id: formData.type === 'observation' ? (formData.species_id || null) : null,
+      description: formData.description,
+      image_url: formData.image_url,
+      location: `POINT(${coords.lng} ${coords.lat})`,
+      is_verified: formData.type === 'alert' ? true : false,
+      type: formData.type,
+      alert_level: formData.alert_level
+    };
+
+    if (!isOnline) {
+      await db.reports.add({
+        species_id: reportData.species_id,
+        description: reportData.description,
+        image_url: reportData.image_url,
+        location: reportData.location,
+        type: formData.type as any,
+        alert_level: formData.alert_level,
+        created_at: new Date().toISOString()
+      });
+      toast.success("Hors-ligne : Signalement enregistré localement sur votre téléphone !");
+      setTimeout(() => router.push('/profil'), 2000);
+      setLoading(false);
+      return;
+    }
+
+    const { error } = await supabase.from('observations').insert([reportData]);
 
     if (error) {
       toast.error("Erreur : " + error.message);
