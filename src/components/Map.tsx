@@ -123,6 +123,34 @@ interface Observation { id: string; description: string; image_url: string; spec
 
 interface MapProps { center?: [number, number]; zoom?: number; filter?: 'all' | 'parks' | 'species'; }
 
+function Legend() {
+  return (
+    <div className="absolute bottom-32 left-3 z-[1000] bg-white/90 backdrop-blur-md p-4 rounded-2xl shadow-2xl border border-stone-100 max-w-[180px] hidden md:block">
+      <h4 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-3">Légende</h4>
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-green-600"></div>
+          <span className="text-[10px] font-bold text-stone-700">Aire Protégée</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+          <span className="text-[10px] font-bold text-stone-700">Observation</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse"></div>
+          <span className="text-[10px] font-bold text-stone-700">Alerte Urgente</span>
+        </div>
+        <div className="pt-2 border-t border-stone-100">
+          <div className="flex items-center gap-2 text-stone-400">
+            <Ruler className="h-3 w-3" />
+            <span className="text-[9px] italic">Mesure km active</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Map({ center = [8.6195, 1.1915], zoom = 7, filter = 'all' }: MapProps) {
   const [areas, setAreas] = useState<ProtectedArea[]>([]);
   const [observations, setObservations] = useState<Observation[]>([]);
@@ -203,6 +231,7 @@ export default function Map({ center = [8.6195, 1.1915], zoom = 7, filter = 'all
         <FullscreenControl position="topleft" />
         <ScaleControl position="bottomleft" imperial={false} />
         <LocationButton />
+        <Legend />
       </MapContainer>
     </div>
   );
