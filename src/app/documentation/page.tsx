@@ -2,11 +2,21 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { FileText, Download, Gavel, BookOpen, Info, Loader2 } from 'lucide-react';
+import { FileText, Download, Gavel, BookOpen, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 
+interface DocumentItem {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  file_url: string;
+  created_at: string;
+  size_mb: number;
+}
+
 export default function DocumentationPage() {
-  const [docs, setDocs] = useState<any[]>([]);
+  const [docs, setDocs] = useState<DocumentItem[]>([]);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
@@ -33,7 +43,7 @@ export default function DocumentationPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         <div className="lg:col-span-2 space-y-6">
           {docs.length > 0 ? docs.map((doc, index) => (
-            <motion.div 
+            <motion.div
               key={doc.id}
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -52,8 +62,8 @@ export default function DocumentationPage() {
                   </span>
                 </div>
               </div>
-              <a 
-                href={doc.file_url} 
+              <a
+                href={doc.file_url}
                 target="_blank"
                 className="p-4 bg-stone-900 text-white rounded-2xl hover:bg-green-600 transition-all shadow-lg"
               >
@@ -76,7 +86,7 @@ export default function DocumentationPage() {
               Le nouveau Code Forestier du Togo (Loi n° 2008-009) renforce la protection des ressources forestières et la participation des citoyens.
             </p>
             <div className="p-4 bg-white/10 rounded-2xl border border-white/10 text-xs font-medium text-stone-300">
-              Saviez-vous que couper un arbre sans autorisation est passible d'amendes au Togo ?
+              Saviez-vous que couper un arbre sans autorisation est passible d&apos;amendes au Togo ?
             </div>
           </div>
         </div>

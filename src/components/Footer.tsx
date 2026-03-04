@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Leaf, Mail, MapPin, Globe, Phone, ExternalLink } from 'lucide-react';
+import { Leaf, Mail, MapPin, Globe } from 'lucide-react';
 
 export function Footer() {
   return (
@@ -21,7 +21,7 @@ export function Footer() {
               <span className="text-2xl font-bold tracking-tight">Eco-Atlas</span>
             </Link>
             <p className="text-stone-400 text-sm leading-relaxed mb-8">
-              L'outil citoyen pour la surveillance et la protection de la biodiversité du Togo. 🇹🇬
+              L&apos;outil citoyen pour la surveillance et la protection de la biodiversité du Togo. 🇹🇬
             </p>
             <div className="flex space-x-4">
               <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center hover:bg-green-600 transition-all cursor-pointer">

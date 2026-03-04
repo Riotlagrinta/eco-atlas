@@ -1,21 +1,22 @@
 {
   "name": "Eco-Atlas Togo",
-  "short_name": "EcoAtlas",
-  "description": "Observatoire de la biodiversité du Togo",
-  "start_url": "/",
+  "short_name": "Eco-Atlas",
+  "description": "Portail collaboratif pour la protection de la biodiversité togolaise.",
+  "start_url": "/carte",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#059669",
+  "background_color": "#f5f5f4",
+  "theme_color": "#16a34a",
+  "orientation": "portrait",
   "icons": [
     {
-      "src": "/globe.svg",
+      "src": "/icon-192x192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml"
+      "type": "image/png"
     },
     {
-      "src": "/globe.svg",
+      "src": "/icon-512x512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml"
+      "type": "image/png"
     }
   ]
 }

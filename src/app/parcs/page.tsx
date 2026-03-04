@@ -2,12 +2,24 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Shield, Trees, Map, ArrowRight, Loader2, Maximize } from 'lucide-react';
+import { Trees, ArrowRight, Loader2, Maximize } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Link from 'next/link';
+import Image from 'next/image';
+
+interface ProtectedArea {
+  id: string;
+  name: string;
+  surface_area?: string;
+  established_year?: number;
+  description?: string;
+  image_url?: string;
+  type?: string;
+  area_km2?: number;
+}
 
 export default function ParcsPage() {
-  const [areas, setAreas] = useState<any[]>([]);
+  const [areas, setAreas] = useState<ProtectedArea[]>([]);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
@@ -44,16 +56,17 @@ export default function ParcsPage() {
             className="group bg-white rounded-3xl border border-stone-100 shadow-xl overflow-hidden flex flex-col"
           >
             <div className="h-64 relative bg-stone-100">
-              <img 
-                src={area.image_url || 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=800&q=80'} 
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
-                alt={area.name} 
+              <Image
+                src={area.image_url || 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=800&q=80'}
+                className="object-cover group-hover:scale-105 transition-transform duration-700"
+                alt={area.name}
+                fill
               />
-              <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold text-stone-900 uppercase tracking-widest border border-stone-100 shadow-sm">
+              <div className="absolute z-10 top-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold text-stone-900 uppercase tracking-widest border border-stone-100 shadow-sm">
                 {area.type}
               </div>
             </div>
-            
+
             <div className="p-8 flex-1 flex flex-col">
               <div className="flex justify-between items-start mb-4">
                 <h3 className="text-2xl font-bold text-stone-900">{area.name}</h3>
@@ -64,18 +77,18 @@ export default function ParcsPage() {
               <p className="text-stone-500 text-sm mb-8 leading-relaxed line-clamp-3">
                 {area.description || "Aucune description détaillée disponible pour le moment."}
               </p>
-              
+
               <div className="mt-auto pt-6 border-t border-stone-50 flex items-center justify-between">
-                <Link 
-                  href={`/parcs/${area.id}`} 
+                <Link
+                  href={`/parcs/${area.id}`}
                   className="flex items-center text-green-600 font-bold text-sm hover:translate-x-2 transition-all"
                 >
                   Détails & Statistiques <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
                 <div className="flex -space-x-2 overflow-hidden">
-                  {[1,2,3].map(i => (
-                    <div key={i} className="inline-block h-8 w-8 rounded-full ring-2 ring-white bg-stone-100 overflow-hidden">
-                      <img src={`https://images.unsplash.com/photo-${1500000000000 + i}?w=50&h=50&fit=crop`} />
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="inline-block h-8 w-8 rounded-full ring-2 ring-white bg-stone-100 overflow-hidden relative">
+                      <Image src={`https://images.unsplash.com/photo-${1500000000000 + i}?w=50&h=50&fit=crop`} alt="Utilisateur" fill className="object-cover" />
                     </div>
                   ))}
                 </div>

@@ -2,11 +2,20 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Camera, MapPin, Loader2, Maximize2, User } from 'lucide-react';
+import { Camera, Loader2, Maximize2, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Image from 'next/image';
+
+interface PhotoItem {
+  id: string;
+  image_url: string;
+  created_at: string;
+  species?: { name: string };
+  profiles?: { full_name: string };
+}
 
 export default function GaleriePage() {
-  const [photos, setPhotos] = useState<any[]>([]);
+  const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
   const supabase = createClient();
@@ -48,10 +57,12 @@ export default function GaleriePage() {
             className="relative group cursor-pointer rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl transition-all border border-stone-100"
             onClick={() => setSelectedPhoto(p.image_url)}
           >
-            <img 
-              src={p.image_url} 
-              alt="Observation" 
+            <Image
+              src={p.image_url}
+              alt="Observation"
               className="w-full h-auto object-cover group-hover:scale-105 transition-transform duration-700"
+              width={800}
+              height={600}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-6">
               <div className="flex items-center justify-between text-white">
@@ -79,15 +90,15 @@ export default function GaleriePage() {
       {/* Lightbox */}
       <AnimatePresence>
         {selectedPhoto && (
-          <div 
+          <div
             className="fixed inset-0 z-[200] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 cursor-zoom-out"
             onClick={() => setSelectedPhoto(null)}
           >
-            <motion.img 
+            <motion.img
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              src={selectedPhoto} 
+              src={selectedPhoto}
               className="max-w-full max-h-full rounded-2xl shadow-2xl"
             />
           </div>

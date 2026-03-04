@@ -36,7 +36,7 @@ export default function ConnexionPage() {
 
   return (
     <div className="min-h-[calc(100vh-64px)] flex items-center justify-center p-4 bg-stone-50">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="max-w-md w-full bg-white rounded-3xl shadow-xl shadow-stone-200/50 border border-stone-100 overflow-hidden"
@@ -103,7 +103,7 @@ export default function ConnexionPage() {
           <div className="mt-8 text-center text-sm text-stone-500">
             Pas encore de compte ?{' '}
             <Link href="/inscription" className="font-bold text-green-600 hover:text-green-700 underline underline-offset-4">
-              S'inscrire gratuitement
+              S&apos;inscrire gratuitement
             </Link>
           </div>
         </div>

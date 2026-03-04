@@ -1,8 +1,9 @@
 'use client';
 
 import React from 'react';
-import { Leaf, Shield, Users, Target, MapPin, Mail } from 'lucide-react';
+import { Users, Target, MapPin, Mail } from 'lucide-react';
 import { motion } from 'framer-motion';
+import Image from 'next/image';
 
 export default function AproposPage() {
   return (
@@ -10,14 +11,15 @@ export default function AproposPage() {
       {/* Hero Section */}
       <section className="relative h-[60vh] flex items-center justify-center overflow-hidden bg-green-900">
         <div className="absolute inset-0 opacity-50">
-          <img
+          <Image
             src="https://images.unsplash.com/photo-1542273917363-3b1817f69a2d?ixlib=rb-4.0.3&auto=format&fit=crop&w=2560&q=80"
             alt="Nature Togo"
-            className="w-full h-full object-cover"
+            fill
+            className="object-cover"
           />
         </div>
         <div className="relative z-10 max-w-7xl mx-auto px-4 text-center text-white">
-          <motion.h1 
+          <motion.h1
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="text-5xl md:text-7xl font-bold mb-6"
@@ -34,10 +36,10 @@ export default function AproposPage() {
       <section className="py-24 max-w-7xl mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
           <div>
-            <h2 className="text-3xl font-bold text-stone-900 mb-6">L'Observatoire Citoyen du Togo</h2>
+            <h2 className="text-3xl font-bold text-stone-900 mb-6">L&apos;Observatoire Citoyen du Togo</h2>
             <p className="text-stone-600 text-lg leading-relaxed mb-6">
-              Eco-Atlas est né d'une volonté simple : donner aux Togolais les outils pour découvrir et protéger leur environnement. 
-              De la réserve de faune de l'Oti aux forêts sacrées des Plateaux, notre plateforme cartographie la vie sauvage pour mieux la défendre.
+              Eco-Atlas est né d&apos;une volonté simple : donner aux Togolais les outils pour découvrir et protéger leur environnement.
+              De la réserve de faune de l&apos;Oti aux forêts sacrées des Plateaux, notre plateforme cartographie la vie sauvage pour mieux la défendre.
             </p>
             <div className="space-y-4">
               <div className="flex items-start space-x-4">
@@ -60,11 +62,12 @@ export default function AproposPage() {
               </div>
             </div>
           </div>
-          <div className="relative">
-            <img 
-              src="https://images.unsplash.com/photo-1501705388883-4ed8a543392c?auto=format&fit=crop&w=800&q=80" 
-              className="rounded-3xl shadow-2xl relative z-10"
+          <div className="relative aspect-square md:aspect-[4/3] w-full">
+            <Image
+              src="https://images.unsplash.com/photo-1501705388883-4ed8a543392c?auto=format&fit=crop&w=800&q=80"
+              className="rounded-3xl shadow-2xl z-10 object-cover"
               alt="Nature togolais"
+              fill
             />
             <div className="absolute -bottom-6 -right-6 w-64 h-64 bg-green-100 rounded-3xl -z-10"></div>
           </div>

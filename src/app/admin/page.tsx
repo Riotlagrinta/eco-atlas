@@ -1,13 +1,14 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/client';
-import { Shield, Plus, Upload, Loader2, CheckCircle, AlertCircle, Trash2, Leaf, Film, Camera, Map as MapIcon, Newspaper, Save, Users, Target, Brain, QrCode, BarChart3, Activity, Edit3, MessageSquare, ChevronRight, X, FileText } from 'lucide-react';
+import { Shield, Plus, Upload, Loader2, CheckCircle, AlertCircle, Trash2, Leaf, Camera, Map as MapIcon, Newspaper, Users, Brain, QrCode, BarChart3, Edit3, MessageSquare, X, FileText } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
+import Image from 'next/image';
 
 export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
@@ -16,29 +17,32 @@ export default function AdminPage() {
   const [uploading, setUploading] = useState(false);
   const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
   const [feedback, setFeedback] = useState<string>('');
-  const [selectedQuizId, setSelectedQuizId] = useState<string | null>(null);
-  
+  const [, setSelectedQuizId] = useState<string | null>(null);
+
   const [formData, setFormData] = useState({ name: '', scientific_name: '', description: '', conservation_status: 'LC', image_url: '', habitat: '', diet: '', population_estimate: '', category: 'Fauna' });
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [quizData, setQuizData] = useState({ title: '', description: '', difficulty: 'easy', image_url: '' });
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [questionData, setQuestionData] = useState({ question_text: '', options: ['', '', ''], correct_index: 0, explanation: '' });
   const [articleData, setArticleData] = useState({ title: '', content: '', image_url: '', category: 'Actualité' });
   const [docData, setDocData] = useState({ title: '', description: '', file_url: '', category: 'Loi' });
 
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [speciesList, setSpeciesList] = useState<any[]>([]);
-  const [obsList, setObsList] = useState<any[]>([]);
-  const [allObsList, setAllObsList] = useState<any[]>([]);
-  const [userList, setUserList] = useState<any[]>([]);
-  const [quizList, setQuizList] = useState<any[]>([]);
-  const [articleList, setArticleList] = useState<any[]>([]);
-  const [documentList, setDocumentList] = useState<any[]>([]);
-  const [adminStats, setAdminStats] = useState<any>(null);
+  const [speciesList, setSpeciesList] = useState<{ id: string, name: string, scientific_name?: string, category?: string, image_url?: string, conservation_status?: string }[]>([]);
+  const [obsList, setObsList] = useState<{ id: string, image_url: string, description: string, type: string, is_resolved: boolean, is_verified: boolean, created_at: string, species?: { name: string }, profiles?: { full_name: string, region: string } }[]>([]);
+  const [allObsList, setAllObsList] = useState<{ id: string, image_url: string, description: string, type: string, is_resolved: boolean, is_verified: boolean, created_at: string, species?: { name: string }, profiles?: { full_name: string, region: string } }[]>([]);
+  const [userList, setUserList] = useState<{ id: string, created_at: string, full_name: string, region: string, role: string }[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [quizList, setQuizList] = useState<{ id: string, title?: string }[]>([]);
+  const [articleList, setArticleList] = useState<{ id: string, title: string }[]>([]);
+  const [documentList, setDocumentList] = useState<{ id: string, title: string }[]>([]);
+  const [adminStats, setAdminStats] = useState<{ totalUsers?: number, adminUsers?: number, userGrowth?: number[], byRegion?: { name: string, count: number }[], totalAlerts?: number, resolvedAlerts?: number } | null>(null);
   const [activeTab, setActiveTab] = useState<'species' | 'obs' | 'users' | 'quizzes' | 'insights' | 'blog' | 'docs'>('species');
 
   const router = useRouter();
   const supabase = createClient();
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     const [s, o, u, q, a, d] = await Promise.all([
       supabase.from('species').select('*').order('created_at', { ascending: false }),
       supabase.from('observations').select('*, species:species_id(name), profiles:user_id(full_name, region)').order('created_at', { ascending: false }),
@@ -51,23 +55,31 @@ export default function AdminPage() {
     if (s.data) setSpeciesList(s.data);
     if (o.data) {
       setAllObsList(o.data);
-      setObsList(o.data.filter((obs: any) => !obs.is_verified));
-      const regionData: any = {};
-      o.data.forEach((obs: any) => {
+      setObsList(o.data.filter((obs: { is_verified: boolean }) => !obs.is_verified));
+      const regionData: Record<string, number> = {};
+      o.data.forEach((obs: { profiles?: { region: string } }) => {
         const reg = obs.profiles?.region || 'Inconnue';
         regionData[reg] = (regionData[reg] || 0) + 1;
       });
-      setAdminStats({
+      const growth = new Array(12).fill(0);
+      if (u.data) {
+        u.data.forEach((user: { created_at: string }) => {
+          const m = new Date(user.created_at).getMonth();
+          growth[m]++;
+        });
+      }
+      setAdminStats((prev) => ({
+        ...prev,
         byRegion: Object.keys(regionData).map(k => ({ name: k, count: regionData[k] })),
-        totalAlerts: o.data.filter((obs: any) => obs.type === 'alert').length,
-        resolvedAlerts: o.data.filter((obs: any) => obs.is_resolved).length
-      });
+        totalAlerts: o.data.filter((obs: { type: string }) => obs.type === 'alert').length,
+        resolvedAlerts: o.data.filter((obs: { is_resolved: boolean }) => obs.is_resolved).length
+      }));
     }
     if (u.data) setUserList(u.data);
     if (q.data) setQuizList(q.data);
     if (a.data) setArticleList(a.data);
     if (d.data) setDocumentList(d.data);
-  };
+  }, [supabase]);
 
   useEffect(() => {
     async function checkAdmin() {
@@ -78,14 +90,14 @@ export default function AdminPage() {
       setLoading(false);
     }
     checkAdmin();
-  }, [router, supabase]);
+  }, [router, supabase, fetchData]);
 
   const handleUpdateRole = async (userId: string, newRole: string) => {
     await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
     fetchData();
   };
 
-  const handleEditSpecies = (s: any) => {
+  const handleEditSpecies = (s: { id: string, name: string, scientific_name?: string, description?: string, conservation_status?: string, image_url?: string, habitat?: string, diet?: string, population_estimate?: string, category?: string }) => {
     setEditingId(s.id);
     setFormData({ name: s.name, scientific_name: s.scientific_name || '', description: s.description || '', conservation_status: s.conservation_status || 'LC', image_url: s.image_url || '', habitat: s.habitat || '', diet: s.diet || '', population_estimate: s.population_estimate || '', category: s.category || 'Fauna' });
     setActiveTab('species');
@@ -159,7 +171,7 @@ export default function AdminPage() {
     <div className="max-w-6xl mx-auto px-4 py-12">
       <div className="flex items-center space-x-4 mb-12">
         <div className="p-3 bg-stone-900 text-white rounded-2xl shadow-lg"><Shield className="h-8 w-8" /></div>
-        <div className="flex-1"><h1 className="text-3xl font-bold text-stone-900">Panel Administrateur</h1><p className="text-stone-500 text-sm">Gestion globale d'Eco-Atlas Togo</p></div>
+        <div className="flex-1"><h1 className="text-3xl font-bold text-stone-900">Panel Administrateur</h1><p className="text-stone-500 text-sm">Gestion globale d&apos;Eco-Atlas Togo</p></div>
         <Link href="/admin/carte" className="bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold px-6 py-3 rounded-2xl flex items-center border border-stone-200 transition-all"><MapIcon className="h-5 w-5 mr-2" /> SIG</Link>
       </div>
 
@@ -173,7 +185,7 @@ export default function AdminPage() {
           { id: 'users', label: 'Membres', icon: Users },
           { id: 'insights', label: 'Insights', icon: BarChart3 }
         ].map((tab) => (
-          <button key={tab.id} onClick={() => {setActiveTab(tab.id as any); setSelectedQuizId(null);}} className={`px-4 py-2.5 rounded-xl transition-all flex items-center ${activeTab === tab.id ? 'bg-green-600 text-white shadow-lg shadow-green-600/20' : 'bg-white text-stone-500 border border-stone-200 hover:bg-stone-50'}`}>
+          <button key={tab.id} onClick={() => { setActiveTab(tab.id as 'species' | 'obs' | 'users' | 'quizzes' | 'insights' | 'blog' | 'docs'); setSelectedQuizId(null); }} className={`px-4 py-2.5 rounded-xl transition-all flex items-center ${activeTab === tab.id ? 'bg-green-600 text-white shadow-lg shadow-green-600/20' : 'bg-white text-stone-500 border border-stone-200 hover:bg-stone-50'}`}>
             <tab.icon className="h-3.5 w-3.5 mr-2" /> {tab.label} {tab.badge ? <span className="ml-2 bg-red-500 text-white px-1.5 py-0.5 rounded-full">{tab.badge}</span> : null}
           </button>
         ))}
@@ -192,22 +204,22 @@ export default function AdminPage() {
             <h2 className="text-xl font-bold mb-8 flex items-center">{editingId ? <Edit3 className="mr-2 text-blue-600" /> : <Plus className="mr-2 text-green-600" />} {editingId ? "Modifier l'espèce" : "Ajouter une espèce"}</h2>
             <form onSubmit={handleSubmitSpecies} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <input type="text" placeholder="Nom" required value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full p-4 bg-stone-50 rounded-2xl outline-none" />
-                <input type="text" placeholder="Nom scientifique" value={formData.scientific_name} onChange={(e) => setFormData({...formData, scientific_name: e.target.value})} className="w-full p-4 bg-stone-50 rounded-2xl outline-none" />
+                <input type="text" placeholder="Nom" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full p-4 bg-stone-50 rounded-2xl outline-none" />
+                <input type="text" placeholder="Nom scientifique" value={formData.scientific_name} onChange={(e) => setFormData({ ...formData, scientific_name: e.target.value })} className="w-full p-4 bg-stone-50 rounded-2xl outline-none" />
               </div>
-              <textarea placeholder="Description" rows={4} value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full p-4 bg-stone-50 rounded-2xl outline-none"></textarea>
+              <textarea placeholder="Description" rows={4} value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="w-full p-4 bg-stone-50 rounded-2xl outline-none"></textarea>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <select value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value as any})} className="w-full p-4 bg-stone-50 rounded-2xl"><option value="Fauna">Faune</option><option value="Flora">Flore</option></select>
+                <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value as 'Fauna' | 'Flora' })} className="w-full p-4 bg-stone-50 rounded-2xl"><option value="Fauna">Faune</option><option value="Flora">Flore</option></select>
                 <div className="relative"><input type="file" id="up" className="hidden" onChange={handleFileUpload} /><label htmlFor="up" className={`flex items-center justify-center w-full p-4 rounded-2xl border-2 border-dashed cursor-pointer font-bold bg-stone-50 text-stone-400`}>{uploading ? <Loader2 className="animate-spin mr-2" /> : <Upload className="mr-2" />} Photo</label></div>
               </div>
               <button type="submit" className={`w-full py-4 rounded-2xl text-white font-bold shadow-lg ${editingId ? 'bg-blue-600' : 'bg-green-600'}`}>{editingId ? "Enregistrer les modifications" : "Publier l'espèce"}</button>
-              {editingId && <button type="button" onClick={() => { setEditingId(null); setFormData({name:'', scientific_name:'', description:'', conservation_status:'LC', image_url:'', habitat:'', diet:'', population_estimate:'', category:'Fauna'}); }} className="w-full text-stone-400 font-bold text-sm">Annuler</button>}
+              {editingId && <button type="button" onClick={() => { setEditingId(null); setFormData({ name: '', scientific_name: '', description: '', conservation_status: 'LC', image_url: '', habitat: '', diet: '', population_estimate: '', category: 'Fauna' }); }} className="w-full text-stone-400 font-bold text-sm">Annuler</button>}
             </form>
           </div>
           <div className="grid grid-cols-1 gap-4">
             {speciesList.map(s => (
               <div key={s.id} className="bg-white p-4 rounded-2xl border border-stone-100 flex items-center justify-between shadow-sm">
-                <div className="flex items-center space-x-4"><img src={s.image_url} className="w-12 h-12 rounded-xl object-cover" /><div><h4 className="font-bold">{s.name}</h4><span className="text-[10px] uppercase font-bold text-stone-400">{s.category}</span></div></div>
+                <div className="flex items-center space-x-4"><div className="w-16 h-16 rounded-xl bg-stone-100 overflow-hidden relative mr-4"><Image src={s.image_url || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?ixlib=rb-4.0.3&auto=format&fit=crop&w=2560&q=80'} className="object-cover" alt={s.name} fill /></div><div><h4 className="font-bold">{s.name}</h4><span className="text-[10px] uppercase font-bold text-stone-400">{s.category}</span></div></div>
                 <div className="flex gap-2">
                   <button onClick={() => setShowQR(`${window.location.origin}/observatoire?id=${s.id}`)} className="p-2 text-stone-400 hover:text-blue-600"><QrCode className="h-5 w-5" /></button>
                   <button onClick={() => handleEditSpecies(s)} className="p-2 text-stone-400 hover:text-green-600"><Edit3 className="h-5 w-5" /></button>
@@ -224,9 +236,9 @@ export default function AdminPage() {
           <div className="bg-white p-8 rounded-3xl shadow-xl border border-stone-100">
             <h2 className="text-xl font-bold mb-8 flex items-center"><Newspaper className="mr-2 text-green-600" /> Rédiger un article</h2>
             <form onSubmit={handleSubmitArticle} className="space-y-6">
-              <input type="text" placeholder="Titre" value={articleData.title} onChange={(e) => setArticleData({...articleData, title: e.target.value})} className="w-full p-4 bg-stone-50 rounded-2xl outline-none" />
-              <textarea placeholder="Contenu" rows={6} value={articleData.content} onChange={(e) => setArticleData({...articleData, content: e.target.value})} className="w-full p-4 bg-stone-50 rounded-2xl outline-none"></textarea>
-              <input type="text" placeholder="URL Image" value={articleData.image_url} onChange={(e) => setArticleData({...articleData, image_url: e.target.value})} className="w-full p-4 bg-stone-50 rounded-2xl outline-none" />
+              <input type="text" placeholder="Titre" value={articleData.title} onChange={(e) => setArticleData({ ...articleData, title: e.target.value })} className="w-full p-4 bg-stone-50 rounded-2xl outline-none" />
+              <textarea placeholder="Contenu" rows={6} value={articleData.content} onChange={(e) => setArticleData({ ...articleData, content: e.target.value })} className="w-full p-4 bg-stone-50 rounded-2xl outline-none"></textarea>
+              <input type="text" placeholder="URL Image" value={articleData.image_url} onChange={(e) => setArticleData({ ...articleData, image_url: e.target.value })} className="w-full p-4 bg-stone-50 rounded-2xl outline-none" />
               <button type="submit" className="w-full py-4 bg-green-600 text-white font-bold rounded-2xl shadow-lg">Publier sur le blog</button>
             </form>
           </div>
@@ -234,7 +246,7 @@ export default function AdminPage() {
             {articleList.map(a => (
               <div key={a.id} className="bg-white p-4 rounded-2xl border border-stone-100 flex items-center justify-between shadow-sm">
                 <h3 className="font-bold">{a.title}</h3>
-                <button onClick={async () => { if(confirm("Supprimer ?")) { await supabase.from('articles').delete().eq('id', a.id); fetchData(); } }} className="p-2 text-stone-300 hover:text-red-600"><Trash2 className="h-5 w-5" /></button>
+                <button onClick={async () => { if (confirm("Supprimer ?")) { await supabase.from('articles').delete().eq('id', a.id); fetchData(); } }} className="p-2 text-stone-300 hover:text-red-600"><Trash2 className="h-5 w-5" /></button>
               </div>
             ))}
           </div>
@@ -246,8 +258,8 @@ export default function AdminPage() {
           <div className="bg-white p-8 rounded-3xl shadow-xl border border-stone-100">
             <h2 className="text-xl font-bold mb-8 flex items-center"><FileText className="mr-2 text-green-600" /> Ajouter un document officiel</h2>
             <form onSubmit={handleSubmitDocument} className="space-y-6">
-              <input type="text" placeholder="Titre" value={docData.title} onChange={(e) => setDocData({...docData, title: e.target.value})} className="w-full p-4 bg-stone-50 rounded-2xl outline-none" />
-              <input type="text" placeholder="URL du fichier (PDF)" value={docData.file_url} onChange={(e) => setDocData({...docData, file_url: e.target.value})} className="w-full p-4 bg-stone-50 rounded-2xl outline-none" />
+              <input type="text" placeholder="Titre" value={docData.title} onChange={(e) => setDocData({ ...docData, title: e.target.value })} className="w-full p-4 bg-stone-50 rounded-2xl outline-none" />
+              <input type="text" placeholder="URL du fichier (PDF)" value={docData.file_url} onChange={(e) => setDocData({ ...docData, file_url: e.target.value })} className="w-full p-4 bg-stone-50 rounded-2xl outline-none" />
               <button type="submit" className="w-full py-4 bg-green-600 text-white font-bold rounded-2xl shadow-lg">Enregistrer le document</button>
             </form>
           </div>
@@ -255,7 +267,7 @@ export default function AdminPage() {
             {documentList.map(d => (
               <div key={d.id} className="bg-white p-4 rounded-2xl border border-stone-100 flex items-center justify-between shadow-sm">
                 <h3 className="font-bold">{d.title}</h3>
-                <button onClick={async () => { if(confirm("Supprimer ?")) { await supabase.from('documents').delete().eq('id', d.id); fetchData(); } }} className="p-2 text-stone-300 hover:text-red-600"><Trash2 className="h-5 w-5" /></button>
+                <button onClick={async () => { if (confirm("Supprimer ?")) { await supabase.from('documents').delete().eq('id', d.id); fetchData(); } }} className="p-2 text-stone-300 hover:text-red-600"><Trash2 className="h-5 w-5" /></button>
               </div>
             ))}
           </div>
@@ -267,7 +279,7 @@ export default function AdminPage() {
           <div className="bg-amber-50 p-6 rounded-3xl border border-amber-100 mb-8"><h3 className="font-bold text-amber-900 mb-2 flex items-center"><MessageSquare className="h-4 w-4 mr-2" /> Modération</h3><textarea placeholder="Feedback pour l'utilisateur..." value={feedback} onChange={(e) => setFeedback(e.target.value)} className="w-full p-4 bg-white border border-amber-200 rounded-2xl outline-none text-sm"></textarea></div>
           <div className="grid grid-cols-1 gap-6">
             {obsList.map(o => (
-              <div key={o.id} className="bg-white rounded-3xl border border-stone-100 overflow-hidden flex flex-col md:flex-row shadow-sm"><img src={o.image_url} className="w-full md:w-48 h-48 object-cover" /><div className="p-6 flex-1"><h3 className="font-bold text-stone-900">{o.species?.name || "Inconnu"} <span className="text-xs font-normal text-stone-400 ml-2">par {o.profiles?.full_name}</span></h3><p className="text-stone-500 text-sm mt-2 mb-6 line-clamp-2">{o.description}</p><div className="flex gap-3"><button onClick={() => handleVerifyObs(o.id)} className="flex-1 bg-green-600 text-white font-bold py-2 rounded-xl">Valider</button><button onClick={() => handleDeleteObs(o.id)} className="flex-1 border border-red-100 text-red-600 font-bold py-2 rounded-xl">Rejeter</button></div></div></div>
+              <div key={o.id} className="bg-white rounded-3xl border border-stone-100 overflow-hidden flex flex-col md:flex-row shadow-sm"><div className="w-full md:w-48 h-48 relative"><Image src={o.image_url} className="object-cover" alt="Observation" fill /></div><div className="p-6 flex-1"><h3 className="font-bold text-stone-900">{o.species?.name || "Inconnu"} <span className="text-xs font-normal text-stone-400 ml-2">par {o.profiles?.full_name}</span></h3><p className="text-stone-500 text-sm mt-2 mb-6 line-clamp-2">{o.description}</p><div className="flex gap-3"><button onClick={() => handleVerifyObs(o.id)} className="flex-1 bg-green-600 text-white font-bold py-2 rounded-xl">Valider</button><button onClick={() => handleDeleteObs(o.id)} className="flex-1 border border-red-100 text-red-600 font-bold py-2 rounded-xl">Rejeter</button></div></div></div>
             ))}
           </div>
         </div>
@@ -275,7 +287,7 @@ export default function AdminPage() {
 
       {activeTab === 'insights' && (
         <div className="space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8"><div className="bg-white p-8 rounded-3xl border border-stone-100 shadow-sm"><h3 className="font-bold text-stone-900 mb-6 flex items-center"><MapIcon className="h-5 w-5 mr-2 text-green-600" /> Répartition Régionale</h3><div className="h-64 w-full"><ResponsiveContainer width="100%" height="100%"><BarChart data={adminStats?.byRegion}><XAxis dataKey="name" fontSize={10}/><YAxis fontSize={10}/><Tooltip/><Bar dataKey="count" fill="#16a34a" radius={[4, 4, 0, 0]}/></BarChart></ResponsiveContainer></div></div><div className="bg-stone-900 text-white p-8 rounded-3xl shadow-xl flex flex-col justify-center text-center"><h3 className="text-stone-400 font-bold uppercase text-[10px] tracking-widest mb-4">Alertes résolues</h3><span className="text-6xl font-bold mb-2 text-green-400">{adminStats?.resolvedAlerts} / {adminStats?.totalAlerts}</span></div></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8"><div className="bg-white p-8 rounded-3xl border border-stone-100 shadow-sm"><h3 className="font-bold text-stone-900 mb-6 flex items-center"><MapIcon className="h-5 w-5 mr-2 text-green-600" /> Répartition Régionale</h3><div className="h-64 w-full"><ResponsiveContainer width="100%" height="100%"><BarChart data={adminStats?.byRegion}><XAxis dataKey="name" fontSize={10} /><YAxis fontSize={10} /><Tooltip /><Bar dataKey="count" fill="#16a34a" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div></div><div className="bg-stone-900 text-white p-8 rounded-3xl shadow-xl flex flex-col justify-center text-center"><h3 className="text-stone-400 font-bold uppercase text-[10px] tracking-widest mb-4">Alertes résolues</h3><span className="text-6xl font-bold mb-2 text-green-400">{adminStats?.resolvedAlerts} / {adminStats?.totalAlerts}</span></div></div>
           <div className="bg-white rounded-3xl border border-stone-100 overflow-hidden divide-y divide-stone-50">
             {allObsList.filter(o => o.type === 'alert').map(alert => (
               <div key={alert.id} className="p-6 flex items-center justify-between hover:bg-stone-50 transition-all"><div className="flex items-center gap-4"><div className={`w-3 h-3 rounded-full ${alert.is_resolved ? 'bg-green-500' : 'bg-red-500 animate-pulse'}`}></div><div><p className="font-bold text-stone-900 text-sm">{alert.description}</p><p className="text-[10px] text-stone-400 uppercase font-bold">{alert.profiles?.region}</p></div></div><button onClick={() => handleToggleResolve(alert.id, alert.is_resolved)} className={`px-4 py-2 rounded-xl text-[10px] font-bold ${alert.is_resolved ? 'bg-green-50 text-green-600' : 'bg-stone-900 text-white'}`}>{alert.is_resolved ? 'RÉSOLU' : 'RÉSOUDRE'}</button></div>
@@ -311,6 +323,3 @@ export default function AdminPage() {
   );
 }
 
-function ArrowLeftIcon({ className }: { className?: string }) {
-  return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>;
-}

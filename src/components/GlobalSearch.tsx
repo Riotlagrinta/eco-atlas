@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Search, X, Leaf, Map, Newspaper, ArrowRight, Loader2 } from 'lucide-react';
+import { Search, X, Leaf, Map, Newspaper, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
@@ -10,9 +10,7 @@ import Fuse from 'fuse.js';
 export function GlobalSearch() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<any[]>([]);
-  const [allData, setAllData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [allData, setAllData] = useState<Array<{ id: string; name?: string; title?: string; category: string; url: string; type?: string }>>([]);
   const router = useRouter();
   const supabase = createClient();
 
@@ -34,15 +32,15 @@ export function GlobalSearch() {
     preloadData();
   }, [supabase]);
 
-  useEffect(() => {
-    if (!query) return setResults([]);
+  const results = React.useMemo(() => {
+    if (!query) return [];
     const fuse = new Fuse(allData, { keys: ['name', 'title'], threshold: 0.3 });
-    setResults(fuse.search(query).map(r => r.item));
+    return fuse.search(query).map(r => r.item);
   }, [query, allData]);
 
   return (
     <>
-      <button 
+      <button
         onClick={() => setIsOpen(true)}
         className="p-2 text-stone-400 hover:text-green-600 transition-all flex items-center gap-2 bg-stone-50 rounded-xl border border-stone-100 px-4"
       >
@@ -53,7 +51,7 @@ export function GlobalSearch() {
       <AnimatePresence>
         {isOpen && (
           <div className="fixed inset-0 z-[200] flex items-start justify-center pt-24 px-4 bg-stone-900/40 backdrop-blur-sm">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: -20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
@@ -61,9 +59,9 @@ export function GlobalSearch() {
             >
               <div className="p-4 flex items-center border-b border-stone-100">
                 <Search className="h-5 w-5 text-green-600 mr-3" />
-                <input 
+                <input
                   autoFocus
-                  type="text" 
+                  type="text"
                   placeholder="Trouver une espèce, un parc, une actualité..."
                   className="flex-1 bg-transparent outline-none text-lg text-stone-900"
                   value={query}
@@ -76,7 +74,7 @@ export function GlobalSearch() {
 
               <div className="max-h-[60vh] overflow-y-auto p-4">
                 {results.length > 0 ? results.map((res, i) => (
-                  <button 
+                  <button
                     key={i}
                     onClick={() => {
                       router.push(res.url);
@@ -96,7 +94,7 @@ export function GlobalSearch() {
                     <ArrowRight className="h-4 w-4 text-stone-300 group-hover:text-green-600 transition-all" />
                   </button>
                 )) : query ? (
-                  <div className="py-12 text-center text-stone-400 italic">Aucun résultat pour "{query}"</div>
+                  <div className="py-12 text-center text-stone-400 italic">Aucun résultat pour &quot;{query}&quot;</div>
                 ) : (
                   <div className="py-12 text-center text-stone-400 text-sm">Commencez à taper pour rechercher...</div>
                 )}

@@ -1,4 +1,4 @@
-export const translations: any = {
+export const translations: Record<string, Record<string, string>> = {
   fr: {
     home: "Accueil",
     map: "Carte SIG",

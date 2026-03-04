@@ -2,14 +2,30 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Leaf, Map, Shield, PlayCircle, Newspaper, Camera } from 'lucide-react';
+import { ArrowRight, Leaf, Map, Shield, PlayCircle, Camera } from 'lucide-react';
 import { WeatherWidget } from '@/components/WeatherWidget';
 import { createClient } from '@/lib/supabase/client';
 import { translations } from '@/lib/i18n';
+import Image from 'next/image';
+
+interface ArticleInfo {
+  id: string;
+  title: string;
+  image_url: string;
+  category: string;
+  created_at: string;
+}
+
+interface ObsInfo {
+  id: string;
+  image_url: string | null;
+  description: string;
+  species?: { name: string } | null;
+}
 
 export default function Home() {
-  const [latestArticles, setLatestArticles] = useState<any[]>([]);
-  const [latestObs, setLatestObs] = useState<any[]>([]);
+  const [latestArticles, setLatestArticles] = useState<ArticleInfo[]>([]);
+  const [latestObs, setLatestObs] = useState<ObsInfo[]>([]);
   const [lang, setLang] = useState<'fr' | 'ee' | 'kby'>('fr');
   const supabase = createClient();
 
@@ -42,13 +58,13 @@ export default function Home() {
       {/* Hero Section */}
       <section className="relative h-[85vh] flex items-center justify-center overflow-hidden bg-stone-50">
         <div className="absolute inset-0 opacity-20">
-          <img src="https://images.unsplash.com/photo-1441974231531-c6227db76b6e?ixlib=rb-4.0.3&auto=format&fit=crop&w=2560&q=80" className="w-full h-full object-cover" alt="Nature" />
+          <Image src="https://images.unsplash.com/photo-1441974231531-c6227db76b6e?ixlib=rb-4.0.3&auto=format&fit=crop&w=2560&q=80" className="object-cover" alt="Nature" fill priority />
         </div>
         <div className="relative z-10 max-w-7xl mx-auto px-4 text-center">
           <div>
             <div className="flex justify-center space-x-2 mb-6">
               {['fr', 'ee', 'kby'].map(l => (
-                <button key={l} onClick={() => setLang(l as any)} className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase transition-all ${lang === l ? 'bg-green-600 text-white shadow-lg' : 'bg-white text-stone-400 border border-stone-100'}`}>{l}</button>
+                <button key={l} onClick={() => setLang(l as 'fr' | 'ee' | 'kby')} className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase transition-all ${lang === l ? 'bg-green-600 text-white shadow-lg' : 'bg-white text-stone-400 border border-stone-100'}`}>{l}</button>
               ))}
             </div>
             <span className="inline-block px-4 py-1.5 bg-green-100 text-green-700 rounded-full text-xs font-bold uppercase tracking-widest mb-6">
@@ -88,12 +104,12 @@ export default function Home() {
             </h2>
             <p className="text-stone-500 mt-2">Dernières observations validées par nos experts au Togo.</p>
           </div>
-          
+
           <div className="flex space-x-6 overflow-x-auto pb-8 px-4 scrollbar-hide">
             {latestObs.map((obs) => (
               <div key={obs.id} className="min-w-[280px] h-80 relative rounded-3xl overflow-hidden shadow-xl border border-stone-100 group">
-                <img src={obs.image_url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt="Terrain" />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-6">
+                <Image src={obs.image_url || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'} alt="Observation" fill className="object-cover group-hover:scale-110 transition-transform duration-700" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-6 z-10">
                   <span className="text-[10px] font-bold text-green-400 uppercase tracking-widest mb-1">{obs.species?.name || "Espèce inconnue"}</span>
                   <p className="text-white text-sm font-medium line-clamp-2">{obs.description}</p>
                 </div>
@@ -119,8 +135,8 @@ export default function Home() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {latestArticles.map((article) => (
                 <Link key={article.id} href="/actualites" className="group">
-                  <div className="aspect-video rounded-2xl overflow-hidden bg-stone-100 mb-4 border border-stone-100 transition-all group-hover:shadow-lg">
-                    <img src={article.image_url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" alt="News" />
+                  <div className="aspect-video rounded-2xl overflow-hidden bg-stone-100 mb-4 border border-stone-100 transition-all group-hover:shadow-lg relative">
+                    <Image src={article.image_url} className="object-cover group-hover:scale-105 transition-transform duration-500" alt="News" fill />
                   </div>
                   <h4 className="font-bold text-stone-900 group-hover:text-green-600 transition-colors line-clamp-2">{article.title}</h4>
                   <p className="text-[10px] text-stone-400 mt-2 font-bold uppercase tracking-widest">{article.category}</p>

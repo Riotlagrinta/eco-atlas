@@ -1,5 +1,7 @@
 import type { NextConfig } from "next";
-const withPWA = require('next-pwa')({
+
+import "@ducanh2912/next-pwa";
+const withPWA = require("@ducanh2912/next-pwa").default({
   dest: 'public',
   register: true,
   skipWaiting: true,
@@ -7,8 +9,12 @@ const withPWA = require('next-pwa')({
 });
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  turbopack: {}
+  turbopack: {},
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: '**' }
+    ]
+  }
 };
 
-module.exports = withPWA(nextConfig);
+export default withPWA(nextConfig);

@@ -3,19 +3,39 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Camera, MapPin, Loader2, CheckCircle, AlertCircle, Send, Leaf } from 'lucide-react';
+import { Camera, MapPin, Loader2, CheckCircle, AlertCircle, Send } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { db } from '@/lib/offline-db';
+import Image from 'next/image';
+import { z } from 'zod';
+import { addXP, incrementChallengeProgress, XP_REWARDS } from '@/lib/gamification';
+import { LevelUpModal } from '@/components/LevelUpModal';
+
+const observationSchema = z.object({
+  user_id: z.string().uuid("L'ID utilisateur est invalide").optional(),
+  species_id: z.string().uuid("L'ID de l'espèce est invalide").nullable(),
+  description: z.string().min(10, "La description doit contenir au moins 10 caractères").max(1000, "La description est trop longue"),
+  image_url: z.string().url("Une photo valide est requise"),
+  location: z.string().startsWith("POINT(", "Format de localisation invalide"),
+  is_verified: z.boolean(),
+  type: z.enum(['observation', 'alert']),
+  alert_level: z.enum(['low', 'medium', 'high', 'critical'])
+});
 
 export default function SignalerPage() {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+  const [showLevelUp, setShowLevelUp] = useState(false);
+  const [newLevel, setNewLevel] = useState(1);
   // ... rest
-  
+
   useEffect(() => {
-    setIsOnline(navigator.onLine);
+    setTimeout(() => {
+      if (typeof navigator !== 'undefined') setIsOnline(navigator.onLine);
+    }, 0);
     window.addEventListener('online', () => {
       setIsOnline(true);
       toast.success("Connexion rétablie !");
@@ -27,8 +47,8 @@ export default function SignalerPage() {
   }, []);
   const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
   const [coords, setCoords] = useState<{ lat: number, lng: number } | null>(null);
-  const [species, setSpecies] = useState<any[]>([]);
-  
+  const [species, setSpecies] = useState<{ id: string, name: string }[]>([]);
+
   const [formData, setFormData] = useState({
     species_id: '',
     description: '',
@@ -44,7 +64,7 @@ export default function SignalerPage() {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) router.push('/connexion');
-      
+
       const { data } = await supabase.from('species').select('id, name').order('name');
       if (data) setSpecies(data);
     }
@@ -84,9 +104,47 @@ export default function SignalerPage() {
 
     if (!uploadError) {
       const { data: { publicUrl } } = supabase.storage.from('observations').getPublicUrl(filePath);
-      setFormData({ ...formData, image_url: publicUrl });
+
+      // Auto-complétion avec Groq Vision
+      setIsAnalyzing(true);
+      try {
+        const response = await fetch('/api/analyze-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ image: publicUrl })
+        });
+        const result = await response.json();
+
+        if (result.success && result.data) {
+          const ai = result.data;
+
+          // Recherche si l'espèce décrite par l'IA existe déjà dans notre BDD
+          const matchedSpecies = species.find(s =>
+            s.name.toLowerCase().includes(ai.name.toLowerCase()) ||
+            (ai.scientific_name && s.name.toLowerCase().includes(ai.scientific_name.toLowerCase()))
+          );
+
+          setFormData({
+            ...formData,
+            image_url: publicUrl,
+            description: `${ai.name} ${ai.scientific_name ? `(${ai.scientific_name})` : ''}\n\n${ai.description}\n\nStatut de conservation estimé : ${ai.conservation_status}`,
+            species_id: matchedSpecies ? matchedSpecies.id : formData.species_id
+          });
+          toast.success("Image analysée par l'IA avec succès ✨");
+        } else {
+          setFormData({ ...formData, image_url: publicUrl });
+          toast.error(result.error || "L'IA n'a pas pu identifier l'image.");
+        }
+      } catch (err) {
+        console.error("Erreur IA:", err);
+        setFormData({ ...formData, image_url: publicUrl });
+      } finally {
+        setIsAnalyzing(false);
+      }
+    } else {
+      setUploading(false);
+      toast.error("Erreur de téléchargement de l'image.");
     }
-    setUploading(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -110,41 +168,72 @@ export default function SignalerPage() {
       alert_level: formData.alert_level
     };
 
-    if (!isOnline) {
-      await db.reports.add({
-        species_id: reportData.species_id,
-        description: reportData.description,
-        image_url: reportData.image_url,
-        location: reportData.location,
-        type: formData.type as any,
-        alert_level: formData.alert_level,
-        created_at: new Date().toISOString()
-      });
-      toast.success("Hors-ligne : Signalement enregistré localement sur votre téléphone !");
-      setTimeout(() => router.push('/profil'), 2000);
+    // 🛡️ Validation stricte des données via Zod avec safeParse
+    const parsedData = observationSchema.safeParse(reportData);
+
+    if (!parsedData.success) {
+      toast.error(parsedData.error.issues[0].message);
       setLoading(false);
       return;
     }
 
-    const { error } = await supabase.from('observations').insert([reportData]);
+    try {
+      if (!isOnline) {
+        await db.reports.add({
+          species_id: reportData.species_id || '',
+          description: reportData.description,
+          image_url: reportData.image_url,
+          location: reportData.location,
+          type: formData.type as 'observation' | 'alert',
+          alert_level: formData.alert_level,
+          created_at: new Date().toISOString()
+        });
+        toast.success("Hors-ligne : Signalement enregistré localement sur votre téléphone !");
+        setTimeout(() => router.push('/profil'), 2000);
+        setLoading(false);
+        return;
+      }
 
-    if (error) {
-      toast.error("Erreur : " + error.message);
-    } else {
-      toast.success(formData.type === 'alert' ? "ALERTE ENVOYÉE !" : "Observation envoyée avec succès !");
-      setTimeout(() => router.push('/carte'), 2000);
+      const { error } = await supabase.from('observations').insert([reportData]);
+
+      if (error) {
+        toast.error("Erreur : " + error.message);
+      } else {
+        // 🎮 Récompense XP
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        if (currentUser) {
+          const xpAmount = formData.type === 'alert' ? XP_REWARDS.ALERT_SENT : XP_REWARDS.OBSERVATION_VALIDATED;
+          const result = await addXP(currentUser.id, xpAmount, formData.type === 'alert' ? 'Alerte envoyée' : 'Observation envoyée');
+          toast.success(`+${xpAmount} XP ✨`, { icon: '🎮' });
+
+          // Vérifier le level-up
+          if (result.leveledUp) {
+            setNewLevel(result.newLevel);
+            setShowLevelUp(true);
+          }
+
+          // Progrémenter les défis
+          await incrementChallengeProgress(currentUser.id, formData.type === 'alert' ? 'alerts' : 'observations');
+        }
+        toast.success(formData.type === 'alert' ? "ALERTE ENVOYÉE !" : "Observation envoyée avec succès !");
+        setTimeout(() => router.push('/carte'), 2000);
+      }
+    } catch (err) {
+      toast.error("Une erreur inattendue s'est produite lors de l'envoi.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   return (
     <div className="max-w-2xl mx-auto px-4 py-8">
+      <LevelUpModal isOpen={showLevelUp} newLevel={newLevel} onClose={() => setShowLevelUp(false)} />
       <div className="text-center mb-10">
         <div className="inline-flex p-4 bg-green-100 rounded-3xl text-green-600 mb-4">
           <Camera className="h-8 w-8" />
         </div>
         <h1 className="text-3xl font-bold text-stone-900">Signaler une espèce</h1>
-        <p className="text-stone-500 mt-2">Contribuez à l'inventaire de la biodiversité du Togo</p>
+        <p className="text-stone-500 mt-2">Contribuez à l&apos;inventaire de la biodiversité du Togo</p>
       </div>
 
       {status && (
@@ -168,14 +257,14 @@ export default function SignalerPage() {
           <div className="flex p-1 bg-stone-100 rounded-2xl mb-6">
             <button
               type="button"
-              onClick={() => setFormData({...formData, type: 'observation'})}
+              onClick={() => setFormData({ ...formData, type: 'observation' })}
               className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${formData.type === 'observation' ? 'bg-white text-green-600 shadow-sm' : 'text-stone-500'}`}
             >
               Observation
             </button>
             <button
               type="button"
-              onClick={() => setFormData({...formData, type: 'alert'})}
+              onClick={() => setFormData({ ...formData, type: 'alert' })}
               className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all ${formData.type === 'alert' ? 'bg-red-600 text-white shadow-sm' : 'text-stone-500'}`}
             >
               Alerte Urgente
@@ -184,10 +273,14 @@ export default function SignalerPage() {
 
           <div className="relative">
             <input type="file" id="obs-upload" className="hidden" accept="image/*" onChange={handleFileUpload} />
-            <label htmlFor="obs-upload" className={`flex flex-col items-center justify-center w-full aspect-video rounded-2xl border-2 border-dashed transition-all cursor-pointer overflow-hidden ${formData.image_url ? 'border-green-500' : 'border-stone-200 hover:border-green-400'}`}>
-              {uploading ? <Loader2 className="h-8 w-8 animate-spin text-green-600" /> : 
-                formData.image_url ? <img src={formData.image_url} className="w-full h-full object-cover" /> :
-                <div className="text-center"><Camera className="h-10 w-10 mx-auto text-stone-300 mb-2" /><span className="text-stone-400 font-medium">Prendre une photo</span></div>
+            <label htmlFor="obs-upload" className={`flex flex-col items-center justify-center w-full aspect-video rounded-2xl border-2 border-dashed transition-all cursor-pointer overflow-hidden relative ${formData.image_url ? 'border-green-500' : 'border-stone-200 hover:border-green-400'}`}>
+              {uploading || isAnalyzing ?
+                <div className="flex flex-col items-center text-green-600">
+                  <Loader2 className="h-8 w-8 animate-spin mb-2" />
+                  <span className="font-bold text-sm">{isAnalyzing ? "L'IA analyse votre photo ✨..." : "Téléchargement..."}</span>
+                </div> :
+                formData.image_url ? <Image src={formData.image_url} className="object-cover" alt="Observation" fill /> :
+                  <div className="text-center"><Camera className="h-10 w-10 mx-auto text-stone-300 mb-2" /><span className="text-stone-400 font-medium">Prendre une photo</span></div>
               }
             </label>
           </div>
@@ -206,21 +299,21 @@ export default function SignalerPage() {
             </div>
           ) : (
             <div>
-              <label className="block text-sm font-bold text-red-700 mb-2 ml-1">Niveau d'Urgence</label>
+              <label className="block text-sm font-bold text-red-700 mb-2 ml-1">Niveau d&apos;Urgence</label>
               <select
                 value={formData.alert_level}
                 onChange={(e) => setFormData({ ...formData, alert_level: e.target.value })}
                 className="w-full px-4 py-3 bg-red-50 border border-red-100 text-red-700 font-bold rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition-all"
               >
                 <option value="medium">Moyen (Pollution, déchet)</option>
-                <option value="high">Élevé (Abattage d'arbres)</option>
+                <option value="high">Élevé (Abattage d&apos;arbres)</option>
                 <option value="critical">Critique (Braconnage, Feu de brousse)</option>
               </select>
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-bold text-stone-700 mb-2 ml-1">Détails de l'observation</label>
+            <label className="block text-sm font-bold text-stone-700 mb-2 ml-1">Détails de l&apos;observation</label>
             <textarea
               required
               rows={3}
@@ -234,8 +327,8 @@ export default function SignalerPage() {
 
         <button
           type="submit"
-          disabled={loading || uploading}
-          className="w-full bg-stone-900 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-stone-800 transition-all flex items-center justify-center space-x-2"
+          disabled={loading || uploading || isAnalyzing}
+          className="w-full bg-stone-900 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-stone-800 transition-all flex items-center justify-center space-x-2 disabled:opacity-50"
         >
           {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <><Send className="h-5 w-5" /><span>Envoyer le signalement</span></>}
         </button>

@@ -3,17 +3,17 @@
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { createClient } from '@/lib/supabase/client';
-import { Shield, Map as MapIcon, Save, Loader2, ArrowLeft } from 'lucide-react';
+import { Map as MapIcon, Loader2, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 const MapEditor = dynamic(() => import('@/components/MapEditor'), {
   ssr: false,
-  loading: () => <div className="h-[70vh] bg-stone-100 animate-pulse flex items-center justify-center">Chargement de l'éditeur SIG...</div>
+  loading: () => <div className="h-[70vh] bg-stone-100 animate-pulse flex items-center justify-center">Chargement de l&apos;éditeur SIG...</div>
 });
 
 export default function AdminCartePage() {
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const supabase = createClient();

@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { Search, Filter, Info, Leaf, Map as MapIcon, Loader2, MapPin } from 'lucide-react';
+import { Map as MapIcon, Loader2, MapPin, Info } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { motion } from 'framer-motion';
+import Image from 'next/image';
 
 const Map = dynamic(() => import('@/components/Map'), {
   ssr: false,
@@ -17,8 +18,8 @@ const Map = dynamic(() => import('@/components/Map'), {
 
 export default function CartePage() {
   const [activeFilter, setActiveFilter] = useState<'all' | 'parks' | 'species'>('all');
-  const [recentObs, setRecentObs] = useState<any[]>([]);
-  const [nearby, setNearby] = useState<any>(null);
+  const [recentObs, setRecentObs] = useState<{ id: string, image_url?: string, description: string, species_name?: string, species?: { name: string } }[]>([]);
+  const [nearby, setNearby] = useState<{ observations?: { id: string, name: string, dist: number, image: string }[] } | null>(null);
   const [isScanning, setIsScanning] = useState(false);
   const supabase = createClient();
 
@@ -56,9 +57,9 @@ export default function CartePage() {
           <h1 className="text-2xl font-bold text-stone-900 mb-6 flex items-center">
             <MapIcon className="h-6 w-6 mr-2 text-green-600" /> Atlas Togo
           </h1>
-          
+
           <div className="space-y-4">
-            <button 
+            <button
               onClick={scanNearby}
               disabled={isScanning}
               className="w-full py-3 bg-stone-900 text-white rounded-2xl font-bold text-xs uppercase tracking-widest flex items-center justify-center hover:bg-green-600 transition-all shadow-lg"
@@ -67,19 +68,19 @@ export default function CartePage() {
             </button>
 
             <div className="flex flex-wrap gap-2">
-              <button 
+              <button
                 onClick={() => setActiveFilter('all')}
                 className={`px-3 py-1 text-xs font-semibold rounded-full border transition-all ${activeFilter === 'all' ? 'bg-green-600 text-white border-green-600' : 'bg-stone-100 text-stone-600 border-stone-200'}`}
               >
                 Tout voir
               </button>
-              <button 
+              <button
                 onClick={() => setActiveFilter('parks')}
                 className={`px-3 py-1 text-xs font-semibold rounded-full border transition-all ${activeFilter === 'parks' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-stone-100 text-stone-600 border-stone-200'}`}
               >
                 Parcs & Réserves
               </button>
-              <button 
+              <button
                 onClick={() => setActiveFilter('species')}
                 className={`px-3 py-1 text-xs font-semibold rounded-full border transition-all ${activeFilter === 'species' ? 'bg-blue-600 text-white border-blue-600' : 'bg-stone-100 text-stone-600 border-stone-200'}`}
               >
@@ -105,15 +106,15 @@ export default function CartePage() {
 
           <div className="space-y-4">
             <h3 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Derniers signalements au Togo</h3>
-            
+
             {nearby && (
               <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="p-4 bg-green-600 rounded-3xl text-white shadow-xl mb-6">
                 <h4 className="text-xs font-bold uppercase mb-4 flex items-center"><MapPin className="h-3 w-3 mr-1" /> À proximité (50km)</h4>
                 <div className="space-y-3">
-                  {nearby.observations?.map((o: any) => (
+                  {nearby.observations?.map((o: { id: string, name: string, dist: number, image: string }) => (
                     <div key={o.id} className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-white/20 overflow-hidden"><img src={o.image} className="w-full h-full object-cover" /></div>
-                      <span className="text-[10px] font-bold">{o.name} ({(o.dist/1000).toFixed(1)}km)</span>
+                      <div className="w-8 h-8 rounded-lg bg-white/20 overflow-hidden relative"><Image src={o.image} className="object-cover" alt={o.name} fill /></div>
+                      <span className="text-[10px] font-bold">{o.name} ({(o.dist / 1000).toFixed(1)}km)</span>
                     </div>
                   ))}
                   {!nearby.observations && <p className="text-[9px] opacity-70 italic">Aucune espèce proche détectée.</p>}
@@ -123,11 +124,12 @@ export default function CartePage() {
 
             {recentObs.length > 0 ? recentObs.map((obs) => (
               <div key={obs.id} className="flex items-center space-x-4 p-3 hover:bg-stone-50 rounded-2xl cursor-pointer transition-all border border-transparent hover:border-stone-100 group">
-                <div className="w-14 h-14 bg-stone-100 rounded-xl overflow-hidden flex-shrink-0 shadow-sm">
-                  <img 
-                    src={obs.image_url || 'https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=100&q=80'} 
-                    alt="Observation" 
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform"
+                <div className="w-14 h-14 bg-stone-100 rounded-xl overflow-hidden flex-shrink-0 shadow-sm relative">
+                  <Image
+                    src={obs.image_url || 'https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=100&q=80'}
+                    alt="Observation"
+                    className="object-cover group-hover:scale-110 transition-transform"
+                    fill
                   />
                 </div>
                 <div className="min-w-0">
@@ -145,7 +147,7 @@ export default function CartePage() {
       {/* Main Map Area */}
       <div className="flex-1 relative bg-stone-100">
         <Map filter={activeFilter} />
-        
+
         {/* Floating Stats */}
         <div className="absolute bottom-6 right-6 z-[1000] bg-white/90 backdrop-blur shadow-2xl rounded-2xl p-4 border border-white/50 hidden sm:block">
           <div className="flex gap-8">

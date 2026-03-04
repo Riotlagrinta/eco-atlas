@@ -2,29 +2,28 @@
 
 import { MapContainer, TileLayer, FeatureGroup, LayersControl } from 'react-leaflet';
 import { EditControl } from 'react-leaflet-draw';
-import L from 'leaflet';
+
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
 import { createClient } from '@/lib/supabase/client';
-import { useState } from 'react';
+
 
 const { BaseLayer } = LayersControl;
 
 export default function MapEditor() {
   const supabase = createClient();
-  const [status, setStatus] = useState<string>('');
-
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const _onCreate = async (e: any) => {
     const { layerType, layer } = e;
     if (layerType === 'polygon') {
       const name = prompt("Nom de la zone protégée :");
       if (!name) return;
 
-      const coords = layer.getLatLngs()[0].map((latlng: any) => `${latlng.lng} ${latlng.lat}`).join(', ');
+      const coords = layer.getLatLngs()[0].map((latlng: { lng: number, lat: number }) => `${latlng.lng} ${latlng.lat}`).join(', ');
       // Fermer le polygone
       const firstCoord = layer.getLatLngs()[0][0];
       const closedCoords = `${coords}, ${firstCoord.lng} ${firstCoord.lat}`;
-      
+
       const wkt = `POLYGON((${closedCoords}))`;
 
       const { error } = await supabase

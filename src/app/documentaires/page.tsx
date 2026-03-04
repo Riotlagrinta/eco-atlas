@@ -2,8 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Play, Clock, Film, Search, Loader2, X } from 'lucide-react';
+import { Play, Film, Loader2, X } from 'lucide-react';
 import { motion } from 'framer-motion';
+import Image from 'next/image';
 
 interface Documentary {
   id: string;
@@ -45,7 +46,7 @@ export default function DocumentairesPage() {
       setLoading(false);
     }
     fetchDocs();
-  }, []);
+  }, [supabase]);
 
   const categories = ['Tous', ...Array.from(new Set(docs.map(d => d.category)))];
   const filteredDocs = filter === 'Tous' ? docs : docs.filter(d => d.category === filter);
@@ -53,18 +54,18 @@ export default function DocumentairesPage() {
   return (
     <div className="min-h-screen bg-white text-stone-900 pt-12 pb-24">
       <div className="max-w-7xl mx-auto px-4">
-        
+
         {/* Lecteur Vidéo Intégré */}
         {selectedDoc && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-100/95 backdrop-blur-md">
             <div className="w-full max-w-5xl aspect-video relative bg-black rounded-3xl overflow-hidden shadow-2xl border border-stone-200">
-              <iframe 
+              <iframe
                 src={getEmbedUrl(selectedDoc.video_url)}
                 className="w-full h-full"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
               ></iframe>
-              <button 
+              <button
                 onClick={() => setSelectedDoc(null)}
                 className="absolute -top-10 right-0 text-stone-900 hover:text-green-600 font-bold flex items-center transition-all bg-white px-4 py-1 rounded-t-xl border-t border-x border-stone-200"
               >
@@ -103,7 +104,7 @@ export default function DocumentairesPage() {
           </div>
         ) : filteredDocs.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredDocs.map((doc, index) => (
+            {filteredDocs.map((doc) => (
               <motion.div
                 key={doc.id}
                 initial={{ opacity: 0, y: 20 }}
@@ -111,10 +112,11 @@ export default function DocumentairesPage() {
                 className="group bg-white rounded-3xl overflow-hidden border border-stone-200 hover:border-green-500/50 transition-all shadow-sm hover:shadow-xl"
               >
                 <div className="relative aspect-video bg-stone-100">
-                  <img
+                  <Image
                     src={doc.thumbnail_url}
                     alt={doc.title}
-                    className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity"
+                    className="object-cover opacity-90 group-hover:opacity-100 transition-opacity"
+                    fill
                   />
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="w-14 h-14 bg-white/90 backdrop-blur-md rounded-full flex items-center justify-center shadow-lg group-hover:bg-green-600 group-hover:text-white transition-all">
@@ -133,8 +135,8 @@ export default function DocumentairesPage() {
                   <p className="text-stone-500 text-sm line-clamp-2 mb-6">
                     {doc.description}
                   </p>
-                  <button 
-                    onClick={() => setSelectedDoc(doc)} 
+                  <button
+                    onClick={() => setSelectedDoc(doc)}
                     className="text-sm font-bold text-green-600 hover:underline flex items-center"
                   >
                     Regarder <Play className="ml-2 h-4 w-4" />

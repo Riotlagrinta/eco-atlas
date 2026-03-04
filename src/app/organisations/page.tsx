@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { ShieldCheck, MapPin, Globe, ExternalLink, Mail, Phone } from 'lucide-react';
+import { ShieldCheck, MapPin, ExternalLink, Mail } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const organisations = [
@@ -43,7 +43,7 @@ export default function OrganisationsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {organisations.map((org, i) => (
-          <motion.div 
+          <motion.div
             key={i}
             whileHover={{ y: -5 }}
             className="bg-white rounded-3xl border border-stone-100 shadow-xl overflow-hidden p-8 flex flex-col justify-between"
@@ -54,7 +54,7 @@ export default function OrganisationsPage() {
               </div>
               <h3 className="text-xl font-bold text-stone-900 mb-4">{org.name}</h3>
               <p className="text-stone-500 text-sm leading-relaxed mb-8">{org.desc}</p>
-              
+
               <div className="space-y-3 mb-8">
                 <div className="flex items-center text-xs text-stone-400 font-medium">
                   <MapPin className="h-4 w-4 mr-2 text-stone-300" /> {org.location}

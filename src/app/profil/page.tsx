@@ -1,31 +1,55 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { User, Camera, CheckCircle, Clock, Award, Loader2, ArrowRight, MapPin, Settings, Upload, Save, X, Heart, Leaf, RefreshCw, Trash2 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { User, Camera, CheckCircle, Clock, Award, Loader2, ArrowRight, MapPin, Settings, Upload, Save, X, Heart, RefreshCw, Zap, Flame, Target } from 'lucide-react';
 import { db } from '@/lib/offline-db';
 import toast, { Toaster } from 'react-hot-toast';
+import Image from 'next/image';
+import { getUserLevel } from '@/lib/gamification';
+import { XPBar } from '@/components/XPBar';
+import Link from 'next/link';
+
+interface ProfileData {
+  id: string;
+  full_name?: string;
+  region?: string;
+  avatar_url?: string;
+  role?: string;
+}
+
+interface ObsData {
+  id: string;
+  image_url: string;
+  description: string;
+  status: string;
+  is_verified: boolean;
+  reject_reason?: string;
+  species?: { name: string };
+  created_at: string;
+}
 
 export default function ProfilPage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
-  const [profile, setProfile] = useState<any>(null);
-  const [observations, setObservations] = useState<any[]>([]);
-  const [badges, setBadges] = useState<any[]>([]);
-  const [favorites, setFavorites] = useState<any[]>([]);
+  const [profile, setProfile] = useState<ProfileData | null>(null);
+  const [observations, setObservations] = useState<ObsData[]>([]);
+  const [badges, setBadges] = useState<{ id: string, badges?: { name: string, icon: string } }[]>([]);
+  const [favorites, setFavorites] = useState<{ id: string, species: { id: string, name: string, image_url: string, scientific_name: string } }[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [offlineReports, setOfflineReports] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState<'obs' | 'favs' | 'sync'>('obs');
   const [isEditing, setIsEditing] = useState(false);
   const [newName, setNewName] = useState('');
   const [newRegion, setNewRegion] = useState('');
-  
+  const [userLevel, setUserLevel] = useState<{ xp: number; level: number; rank: string; streak_days: number } | null>(null);
+
   const regions = ['Maritime', 'Plateaux', 'Centrale', 'Kara', 'Savanes'];
   const router = useRouter();
   const supabase = createClient();
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
       router.push('/connexion');
@@ -50,14 +74,22 @@ export default function ProfilPage() {
     const offData = await db.reports.toArray();
     setOfflineReports(offData);
 
+    // Fetch Gamification
+    const levelData = await getUserLevel(user.id);
+    if (levelData) setUserLevel(levelData);
+
     setLoading(false);
-  };
+  }, [supabase, router]);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    const init = async () => {
+      await fetchData();
+    };
+    init();
+  }, [fetchData]);
 
   const handleUpdateProfile = async () => {
+    if (!profile) return;
     setUpdating(true);
     const { error } = await supabase.from('profiles').update({ full_name: newName, region: newRegion }).eq('id', profile.id);
     if (!error) { setIsEditing(false); fetchData(); toast.success("Profil mis à jour !"); }
@@ -92,7 +124,7 @@ export default function ProfilPage() {
 
   const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !profile) return;
     setUpdating(true);
     const filePath = `avatars/${profile.id}-${Math.random()}.${file.name.split('.').pop()}`;
     const { error: uploadError } = await supabase.storage.from('observations').upload(filePath, file);
@@ -118,8 +150,8 @@ export default function ProfilPage() {
         <div className="px-8 pb-8">
           <div className="relative flex flex-col md:flex-row md:items-end -mt-12 mb-6 gap-6">
             <div className="w-32 h-32 bg-white rounded-3xl p-1 shadow-xl relative group">
-              <div className="w-full h-full bg-stone-100 rounded-2xl flex items-center justify-center overflow-hidden">
-                {profile?.avatar_url ? <img src={profile.avatar_url} className="w-full h-full object-cover" /> : <User className="h-12 w-12 text-stone-300" />}
+              <div className="w-full h-full bg-stone-100 rounded-2xl flex items-center justify-center overflow-hidden relative">
+                {profile?.avatar_url ? <Image src={profile.avatar_url} className="object-cover" alt="Avatar" fill /> : <User className="h-12 w-12 text-stone-300" />}
               </div>
               <label className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer rounded-2xl">
                 <Upload className="text-white h-6 w-6" /><input type="file" className="hidden" onChange={handleAvatarUpload} accept="image/*" />
@@ -147,6 +179,26 @@ export default function ProfilPage() {
         </div>
       </div>
 
+      {/* Barre XP Gamification */}
+      {userLevel && (
+        <div className="mb-8">
+          <XPBar xp={userLevel.xp} level={userLevel.level} />
+          <div className="flex gap-3 mt-4">
+            <Link href="/classement" className="flex-1 flex items-center justify-center gap-2 py-3 bg-yellow-50 text-yellow-700 font-bold text-sm rounded-2xl border border-yellow-200 hover:shadow-md transition-all">
+              <Award className="h-4 w-4" /> Classement
+            </Link>
+            <Link href="/defis" className="flex-1 flex items-center justify-center gap-2 py-3 bg-purple-50 text-purple-700 font-bold text-sm rounded-2xl border border-purple-200 hover:shadow-md transition-all">
+              <Target className="h-4 w-4" /> Mes Défis
+            </Link>
+            {userLevel.streak_days >= 2 && (
+              <div className="flex items-center gap-2 py-3 px-4 bg-orange-50 text-orange-600 font-bold text-sm rounded-2xl border border-orange-200">
+                <Flame className="h-4 w-4" /> {userLevel.streak_days}j
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         <div className="space-y-8">
           <div className="bg-white p-8 rounded-3xl border border-stone-100 shadow-sm text-center">
@@ -171,7 +223,7 @@ export default function ProfilPage() {
             <div className="grid grid-cols-1 gap-4">
               {observations.map((obs) => (
                 <div key={obs.id} className="bg-white p-4 rounded-2xl border border-stone-100 shadow-sm flex items-center justify-between group">
-                  <div className="flex items-center space-x-4"><div className="w-16 h-16 rounded-xl overflow-hidden bg-stone-100 flex-shrink-0"><img src={obs.image_url} className="w-full h-full object-cover" /></div><div><h4 className="font-bold text-stone-900">{obs.species?.name || "Espèce inconnue"}</h4><div className="flex items-center mt-1 text-[10px] font-bold uppercase tracking-wider">{obs.is_verified ? <span className="text-green-600 flex items-center"><CheckCircle className="h-3 w-3 mr-1" /> Validé</span> : <span className="text-amber-500 flex items-center"><Clock className="h-3 w-3 mr-1" /> En attente</span>}</div></div></div>
+                  <div className="flex items-center space-x-4"><div className="w-16 h-16 rounded-xl overflow-hidden bg-stone-100 flex-shrink-0 relative"><Image src={obs.image_url} className="object-cover" alt="Observation" fill /></div><div><h4 className="font-bold text-stone-900">{obs.species?.name || "Espèce inconnue"}</h4><div className="flex items-center mt-1 text-[10px] font-bold uppercase tracking-wider">{obs.is_verified ? <span className="text-green-600 flex items-center"><CheckCircle className="h-3 w-3 mr-1" /> Validé</span> : <span className="text-amber-500 flex items-center"><Clock className="h-3 w-3 mr-1" /> En attente</span>}</div></div></div>
                   <ArrowRight className="h-5 w-5 text-stone-300 group-hover:text-green-600 transition-colors" />
                 </div>
               ))}
@@ -181,7 +233,7 @@ export default function ProfilPage() {
           {activeTab === 'favs' && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               {favorites.map((fav) => (
-                <div key={fav.id} className="bg-white rounded-3xl border border-stone-100 overflow-hidden shadow-sm hover:shadow-md transition-all"><div className="relative h-40 bg-stone-100"><img src={fav.species?.image_url} className="w-full h-full object-cover" /><div className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur rounded-full text-red-500"><Heart className="h-4 w-4 fill-current" /></div></div><div className="p-4"><h4 className="font-bold text-stone-900">{fav.species?.name}</h4><p className="text-xs text-stone-500 italic mb-3">{fav.species?.scientific_name}</p><button onClick={() => router.push(`/observatoire/${fav.species?.id}`)} className="text-[10px] font-bold text-green-600 uppercase tracking-widest hover:underline">Voir la fiche</button></div></div>
+                <div key={fav.id} className="bg-white rounded-3xl border border-stone-100 overflow-hidden shadow-sm hover:shadow-md transition-all"><div className="relative h-40 bg-stone-100"><Image src={fav.species?.image_url} className="object-cover" alt="Espèce" fill /><div className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur rounded-full text-red-500 z-10"><Heart className="h-4 w-4 fill-current" /></div></div><div className="p-4"><h4 className="font-bold text-stone-900">{fav.species?.name}</h4><p className="text-xs text-stone-500 italic mb-3">{fav.species?.scientific_name}</p><button onClick={() => router.push(`/observatoire/${fav.species?.id}`)} className="text-[10px] font-bold text-green-600 uppercase tracking-widest hover:underline">Voir la fiche</button></div></div>
               ))}
             </div>
           )}
@@ -192,8 +244,8 @@ export default function ProfilPage() {
               <h3 className="text-xl font-bold text-stone-900 mb-2">Gestion de la Synchronisation</h3>
               <p className="text-stone-500 text-sm mb-8">Vous avez {offlineReports.length} signalements enregistrés localement sur votre appareil.</p>
               {offlineReports.length > 0 ? (
-                <button 
-                  onClick={syncReports} 
+                <button
+                  onClick={syncReports}
                   disabled={updating}
                   className="w-full py-4 bg-blue-600 text-white font-bold rounded-2xl shadow-xl shadow-blue-600/20 hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
                 >

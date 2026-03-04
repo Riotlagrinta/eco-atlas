@@ -1,16 +1,17 @@
 'use client';
 
-import React, { useEffect, useState, Suspense } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Leaf, MapPin, Loader2, ArrowLeft, Heart, Share2, MessageSquare, Send, User, X } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { MapPin, Loader2, ArrowLeft, Share2, MessageSquare, Send, User, Camera, Clock, CheckCircle } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
+import Image from 'next/image';
+import { VotePanel } from '@/components/VotePanel';
 
-const MiniMap = dynamic(() => import('@/components/Map'), { 
-  ssr: false, 
-  loading: () => <div className="h-full bg-stone-100 animate-pulse" /> 
+const MiniMap = dynamic(() => import('@/components/Map'), {
+  ssr: false,
+  loading: () => <div className="h-full bg-stone-100 animate-pulse" />
 });
 
 interface Species {
@@ -26,6 +27,15 @@ interface Species {
   category: 'Fauna' | 'Flora';
 }
 
+interface Observation {
+  id: string;
+  description: string;
+  image_url: string;
+  is_verified: boolean;
+  created_at: string;
+  profiles: { full_name: string; avatar_url: string | null } | null;
+}
+
 const statusColors: Record<string, string> = {
   'CR': 'bg-red-600', 'EN': 'bg-orange-600', 'VU': 'bg-yellow-500', 'NT': 'bg-blue-500', 'LC': 'bg-green-500',
 };
@@ -33,23 +43,43 @@ const statusColors: Record<string, string> = {
 const statusLabels: Record<string, string> = {
   'CR': 'En danger critique', 'EN': 'En danger', 'VU': 'Vulnérable', 'NT': 'Quasi menacé', 'LC': 'Préoccupation mineure',
 };
+interface SpeciesComment {
+  id: string;
+  content: string;
+  created_at: string;
+  profiles: {
+    full_name: string;
+    avatar_url: string | null;
+  } | null;
+}
 
 export default function SpeciesDetailPage() {
   const { id } = useParams();
   const [species, setSpecies] = useState<Species | null>(null);
-  const [comments, setComments] = useState<any[]>([]);
+  const [comments, setComments] = useState<SpeciesComment[]>([]);
+  const [observations, setObservations] = useState<Observation[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
-  const fetchComments = async (speciesId: string) => {
+  const fetchComments = useCallback(async (speciesId: string) => {
     const { data } = await supabase
       .from('comments')
       .select('*, profiles(full_name, avatar_url)')
       .eq('species_id', speciesId)
       .order('created_at', { ascending: true });
     if (data) setComments(data);
-  };
+  }, [supabase]);
+
+  const fetchObservations = useCallback(async (speciesId: string) => {
+    const { data } = await supabase
+      .from('observations')
+      .select('*, profiles:user_id(full_name, avatar_url)')
+      .eq('species_id', speciesId)
+      .order('created_at', { ascending: false })
+      .limit(5);
+    if (data) setObservations(data as unknown as Observation[]);
+  }, [supabase]);
 
   useEffect(() => {
     async function fetchData() {
@@ -58,22 +88,23 @@ export default function SpeciesDetailPage() {
         .select('*')
         .eq('id', id)
         .single();
-      
+
       if (data) {
         setSpecies(data);
         fetchComments(data.id);
+        fetchObservations(data.id);
       }
       setLoading(false);
     }
     fetchData();
-  }, [id, supabase]);
+  }, [id, supabase, fetchComments, fetchObservations]);
 
   const handleSendComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim()) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return alert("Connectez-vous pour commenter !");
-    
+
     await supabase.from('comments').insert([{
       user_id: user.id,
       species_id: species?.id,
@@ -89,13 +120,13 @@ export default function SpeciesDetailPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-12 bg-white min-h-screen">
       <Link href="/observatoire" className="inline-flex items-center text-stone-400 hover:text-green-600 font-bold text-sm mb-8 transition-colors group">
-        <ArrowLeft className="h-4 w-4 mr-2 group-hover:-translate-x-1 transition-transform" /> Retour à l'observatoire
+        <ArrowLeft className="h-4 w-4 mr-2 group-hover:-translate-x-1 transition-transform" /> Retour à l&apos;observatoire
       </Link>
 
       <div className="bg-white rounded-3xl border border-stone-200 shadow-2xl overflow-hidden mb-12">
         <div className="relative h-64 md:h-[50vh]">
-          <img src={species.image_url} className="w-full h-full object-cover" alt={species.name} />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex flex-col justify-end p-8">
+          <Image src={species.image_url} className="object-cover" alt={species.name} fill />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex flex-col justify-end p-8 z-10">
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">{species.name}</h1>
             <p className="text-stone-200 text-lg italic">{species.scientific_name}</p>
           </div>
@@ -107,7 +138,7 @@ export default function SpeciesDetailPage() {
               Statut UICN : {statusLabels[species.conservation_status]}
             </div>
             <div className="flex gap-4">
-              <button 
+              <button
                 onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent("Découvrez le " + species.name + " sur Eco-Atlas Togo 🇹🇬 : " + window.location.href)}`, '_blank')}
                 className="flex items-center gap-2 px-6 py-3 bg-green-50 text-green-600 font-bold rounded-2xl hover:bg-green-100 transition-all border border-green-100"
               >
@@ -137,11 +168,68 @@ export default function SpeciesDetailPage() {
           {/* Carte de Répartition */}
           <div className="mb-16">
             <h3 className="text-xl font-bold text-stone-900 mb-6 flex items-center">
-              <MapPin className="h-5 w-5 mr-2 text-green-600" /> Zone d'observation au Togo
+              <MapPin className="h-5 w-5 mr-2 text-green-600" /> Zone d&apos;observation au Togo
             </h3>
             <div className="h-80 rounded-3xl overflow-hidden border border-stone-200 shadow-inner">
               <MiniMap filter="species" />
             </div>
+          </div>
+
+          {/* Section Signalements Récents */}
+          <div className="mb-16">
+            <h3 className="text-xl font-bold text-stone-900 mb-8 flex items-center">
+              <Camera className="h-5 w-5 mr-2 text-green-600" /> Signalements Récents
+            </h3>
+
+            {observations.length > 0 ? (
+              <div className="space-y-12">
+                {observations.map((obs) => (
+                  <div key={obs.id} className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start bg-stone-50 p-6 rounded-3xl border border-stone-100">
+                    <div className="space-y-4">
+                      <div className="relative h-64 rounded-2xl overflow-hidden shadow-md">
+                        <Image src={obs.image_url} className="object-cover" alt="Observation" fill />
+                        {obs.is_verified && (
+                          <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest flex items-center gap-1 shadow-lg">
+                            <CheckCircle className="h-3 w-3" /> Validé
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 px-2">
+                        <div className="w-8 h-8 rounded-full bg-white border border-stone-200 overflow-hidden relative flex-shrink-0">
+                          {obs.profiles?.avatar_url ? (
+                            <Image src={obs.profiles.avatar_url} className="object-cover" alt="Avatar" fill />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center bg-stone-100 text-stone-400">
+                              <User className="h-4 w-4" />
+                            </div>
+                          )}
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-stone-900">{obs.profiles?.full_name || "Éco-citoyen"}</p>
+                          <p className="text-[10px] text-stone-400 flex items-center gap-1">
+                            <Clock className="h-2.5 w-2.5" /> {new Date(obs.created_at).toLocaleDateString('fr-FR')}
+                          </p>
+                        </div>
+                      </div>
+                      <p className="text-sm text-stone-600 leading-relaxed italic px-2">
+                        &quot;{obs.description}&quot;
+                      </p>
+                    </div>
+
+                    <div className="lg:pt-0">
+                      <VotePanel observationId={obs.id} onVoteSuccess={() => fetchObservations(species!.id)} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12 bg-stone-50 rounded-3xl border-2 border-dashed border-stone-200">
+                <p className="text-stone-400 font-medium">Aucun signalement récent pour cette espèce.</p>
+                <Link href="/signaler" className="text-green-600 font-bold text-sm mt-2 inline-block hover:underline">
+                  Soyez le premier à la signaler !
+                </Link>
+              </div>
+            )}
           </div>
 
           {/* Section Discussion */}
@@ -153,8 +241,8 @@ export default function SpeciesDetailPage() {
             <div className="space-y-6 mb-10">
               {comments.map((c) => (
                 <div key={c.id} className="flex space-x-4">
-                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center border border-stone-200 overflow-hidden flex-shrink-0 shadow-sm">
-                    {c.profiles?.avatar_url ? <img src={c.profiles.avatar_url} className="w-full h-full object-cover" /> : <User className="h-6 w-6 text-stone-300" />}
+                  <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center border border-stone-200 overflow-hidden flex-shrink-0 shadow-sm relative">
+                    {c.profiles?.avatar_url ? <Image src={c.profiles.avatar_url} className="object-cover" alt="Avatar" fill /> : <User className="h-6 w-6 text-stone-300" />}
                   </div>
                   <div className="flex-1">
                     <div className="bg-white p-5 rounded-2xl border border-stone-100 shadow-sm">
@@ -168,9 +256,9 @@ export default function SpeciesDetailPage() {
             </div>
 
             <form onSubmit={handleSendComment} className="relative">
-              <input 
-                type="text" 
-                placeholder="Ajoutez une information ou posez une question..." 
+              <input
+                type="text"
+                placeholder="Ajoutez une information ou posez une question..."
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
                 className="w-full pl-6 pr-16 py-5 bg-white border border-stone-200 rounded-2xl outline-none focus:ring-2 focus:ring-green-500 shadow-sm"

@@ -2,8 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Brain, Trophy, ArrowRight, Loader2, Star } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Brain, Trophy, ArrowRight, Loader2 } from 'lucide-react';
+import { motion } from 'framer-motion';
+import Image from 'next/image';
 
 interface Quiz {
   id: string;
@@ -101,15 +102,15 @@ export default function QuizPage() {
       {!activeQuiz ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {quizzes.map((quiz) => (
-            <motion.div 
+            <motion.div
               key={quiz.id}
               whileHover={{ y: -5 }}
               className="bg-white rounded-3xl border border-stone-100 shadow-xl overflow-hidden group cursor-pointer"
               onClick={() => startQuiz(quiz)}
             >
               <div className="h-48 bg-stone-100 relative">
-                <img src={quiz.image_url} className="w-full h-full object-cover" alt={quiz.title} />
-                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-[10px] font-bold text-green-600 uppercase tracking-widest">{quiz.difficulty}</div>
+                <Image src={quiz.image_url} className="object-cover" alt={quiz.title} fill />
+                <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-[10px] font-bold text-green-600 uppercase tracking-widest z-10">{quiz.difficulty}</div>
               </div>
               <div className="p-8">
                 <h3 className="text-2xl font-bold text-stone-900 mb-2 group-hover:text-green-600 transition-colors">{quiz.title}</h3>
@@ -126,7 +127,7 @@ export default function QuizPage() {
           <Trophy className="h-20 w-20 text-yellow-500 mx-auto mb-6" />
           <h2 className="text-3xl font-bold text-stone-900 mb-2">Quizz Terminé !</h2>
           <p className="text-stone-500 text-lg mb-8">Votre score : <span className="text-green-600 font-bold">{score} / {questions.length}</span></p>
-          <button 
+          <button
             onClick={() => setActiveQuiz(null)}
             className="bg-stone-900 text-white px-8 py-4 rounded-2xl font-bold hover:bg-green-600 transition-all"
           >
@@ -151,11 +152,10 @@ export default function QuizPage() {
               <button
                 key={index}
                 onClick={() => handleAnswer(index)}
-                className={`w-full p-6 rounded-2xl border-2 text-left font-bold transition-all flex justify-between items-center ${
-                  selectedOption === index 
-                    ? (isCorrect ? 'border-green-500 bg-green-50 text-green-700' : 'border-red-500 bg-red-50 text-red-700')
-                    : 'border-stone-100 bg-white text-stone-600 hover:border-green-200'
-                }`}
+                className={`w-full p-6 rounded-2xl border-2 text-left font-bold transition-all flex justify-between items-center ${selectedOption === index
+                  ? (isCorrect ? 'border-green-500 bg-green-50 text-green-700' : 'border-red-500 bg-red-50 text-red-700')
+                  : 'border-stone-100 bg-white text-stone-600 hover:border-green-200'
+                  }`}
               >
                 {option}
                 {selectedOption === index && (isCorrect ? <CheckCircle className="h-5 w-5" /> : <X className="h-5 w-5" />)}

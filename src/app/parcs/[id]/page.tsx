@@ -1,17 +1,43 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { Shield, Trees, MapPin, Loader2, ArrowLeft, Maximize, Activity, Leaf, Sun, Cloud, CloudRain } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { MapPin, Loader2, ArrowLeft, Activity, Leaf, Sun, Cloud } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
+
+interface ParcData {
+  id: string;
+  name: string;
+  description?: string;
+  surface_area?: string;
+  established_year?: number;
+  image_url?: string;
+  type?: string;
+  area_km2?: number;
+}
+
+interface ParcStats {
+  speciesCount: number;
+  threatenedCount: number;
+  obsCount: number;
+  species_count?: number;
+  observations_count?: number;
+}
+
+interface WeatherInfo {
+  temp: number;
+  condition: string;
+  temperature?: number;
+  weathercode?: number;
+}
 
 export default function ParcDetail() {
   const { id } = useParams();
-  const [parc, setParc] = useState<any>(null);
-  const [stats, setStats] = useState<any>(null);
-  const [weather, setWeather] = useState<any>(null);
+  const [parc, setParc] = useState<ParcData | null>(null);
+  const [stats, setStats] = useState<ParcStats | null>(null);
+  const [weather, setWeather] = useState<WeatherInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
@@ -23,10 +49,10 @@ export default function ParcDetail() {
         .select('*')
         .eq('id', id)
         .single();
-      
+
       if (parcData) {
         setParc(parcData);
-        
+
         // 2. Fetch Spatial Stats (RPC)
         const { data: analytics } = await supabase.rpc('get_park_analytics', { park_id: id });
         setStats(analytics);
@@ -54,8 +80,8 @@ export default function ParcDetail() {
         {/* Colonne Gauche : Image et Info */}
         <div className="lg:col-span-2 space-y-10">
           <div className="relative h-[50vh] rounded-3xl overflow-hidden shadow-2xl border border-stone-100">
-            <img src={parc.image_url} className="w-full h-full object-cover" alt={parc.name} />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex flex-col justify-end p-10">
+            <Image src={parc.image_url || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?ixlib=rb-4.0.3&auto=format&fit=crop&w=2560&q=80'} className="object-cover" alt="Parc National" fill priority />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex flex-col justify-end p-10 z-10">
               <span className="text-green-400 font-bold uppercase tracking-widest text-xs mb-2">{parc.type}</span>
               <h1 className="text-4xl md:text-5xl font-bold text-white mb-2">{parc.name}</h1>
               <p className="text-stone-200 flex items-center"><MapPin className="h-4 w-4 mr-2" /> Patrimoine Naturel du Togo</p>
@@ -76,7 +102,7 @@ export default function ParcDetail() {
             <div className="flex items-center justify-between">
               <div>
                 <span className="text-4xl font-bold text-stone-900">{weather?.temperature}°C</span>
-                <p className="text-xs text-stone-500 mt-1">Température de l'air</p>
+                <p className="text-xs text-stone-500 mt-1">Température de l&apos;air</p>
               </div>
               <div className="p-4 bg-white rounded-2xl shadow-sm">
                 {weather?.weathercode === 0 ? <Sun className="h-8 w-8 text-orange-400" /> : <Cloud className="h-8 w-8 text-blue-400" />}

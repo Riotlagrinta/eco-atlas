@@ -1,16 +1,17 @@
 'use client';
 
-import React, { useEffect, useState, Suspense } from 'react';
+import React, { useEffect, useState, Suspense, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Leaf, Search, AlertTriangle, Loader2, X, Share2, Heart, MessageSquare, Send, User, MapPin, Trees } from 'lucide-react';
+import { Leaf, Search, Loader2, X, Share2, Heart, MessageSquare, Send, User, MapPin, Trees } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 
-const MiniMap = dynamic(() => import('@/components/Map'), { 
-  ssr: false, 
-  loading: () => <div className="h-full bg-stone-100 animate-pulse" /> 
+const MiniMap = dynamic(() => import('@/components/Map'), {
+  ssr: false,
+  loading: () => <div className="h-full bg-stone-100 animate-pulse" />
 });
 
 interface Species {
@@ -33,29 +34,38 @@ const statusColors: Record<string, string> = {
 const statusLabels: Record<string, string> = {
   'CR': 'En danger critique', 'EN': 'En danger', 'VU': 'Vulnérable', 'NT': 'Quasi menacé', 'LC': 'Préoccupation mineure',
 };
+interface SpeciesComment {
+  id: string;
+  content: string;
+  created_at: string;
+  profiles: {
+    full_name: string;
+    avatar_url: string | null;
+  } | null;
+}
 
 function ObservatoireContent() {
   const [species, setSpecies] = useState<Species[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [selectedSpecies, setSelectedSpecies] = useState<Species | null>(null);
   const [activeCategory, setActiveCategory] = useState<'Fauna' | 'Flora'>('Fauna');
-  const [comments, setComments] = useState<any[]>([]);
+  const [comments, setComments] = useState<SpeciesComment[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  
+
   const supabase = createClient();
   const searchParams = useSearchParams();
   const speciesIdFromUrl = searchParams.get('id');
 
-  const fetchComments = async (speciesId: string) => {
+  const fetchComments = useCallback(async (speciesId: string) => {
     const { data } = await supabase
       .from('comments')
       .select('*, profiles(full_name, avatar_url)')
       .eq('species_id', speciesId)
       .order('created_at', { ascending: true });
     if (data) setComments(data);
-  };
+  }, [supabase]);
 
   useEffect(() => {
     async function fetchData() {
@@ -79,7 +89,7 @@ function ObservatoireContent() {
       setLoading(false);
     }
     fetchData();
-  }, [supabase, speciesIdFromUrl]);
+  }, [supabase, speciesIdFromUrl, fetchComments]);
 
   const toggleFavorite = async (speciesId: string) => {
     const { data: { user } } = await supabase.auth.getUser();
@@ -103,7 +113,7 @@ function ObservatoireContent() {
     fetchComments(selectedSpecies!.id);
   };
 
-  const filteredSpecies = species.filter(s => 
+  const filteredSpecies = species.filter(s =>
     s.category === activeCategory &&
     (s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.scientific_name?.toLowerCase().includes(searchTerm.toLowerCase()))
   );
@@ -116,8 +126,8 @@ function ObservatoireContent() {
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-100/90 backdrop-blur-md">
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl relative border border-stone-200">
               <div className="relative h-64 md:h-96">
-                <img src={selectedSpecies.image_url} className="w-full h-full object-cover" alt={selectedSpecies.name} />
-                <button onClick={() => setSelectedSpecies(null)} className="absolute top-4 right-4 bg-white shadow-lg text-stone-900 p-2 rounded-full hover:bg-stone-100 transition-all"><X className="h-6 w-6" /></button>
+                <Image src={selectedSpecies.image_url} className="object-cover" alt={selectedSpecies.name} fill />
+                <button onClick={() => setSelectedSpecies(null)} className="absolute top-4 right-4 bg-white shadow-lg text-stone-900 p-2 rounded-full hover:bg-stone-100 transition-all z-10"><X className="h-6 w-6" /></button>
               </div>
               <div className="p-8">
                 <div className="flex flex-col md:flex-row justify-between items-start mb-6 gap-4">
@@ -142,7 +152,7 @@ function ObservatoireContent() {
                   <div className="space-y-6 mb-8">
                     {comments.map((c) => (
                       <div key={c.id} className="flex space-x-4">
-                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-stone-200 overflow-hidden flex-shrink-0">{c.profiles?.avatar_url ? <img src={c.profiles.avatar_url} className="w-full h-full object-cover" /> : <User className="h-5 w-5 text-stone-300" />}</div>
+                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-stone-200 overflow-hidden flex-shrink-0 relative">{c.profiles?.avatar_url ? <Image src={c.profiles.avatar_url} className="object-cover" alt="Avatar" fill /> : <User className="h-5 w-5 text-stone-300" />}</div>
                         <div className="flex-1"><div className="bg-white p-4 rounded-2xl border border-stone-100 shadow-sm"><p className="font-bold text-xs text-stone-900 mb-1">{c.profiles?.full_name || "Éco-citoyen"}</p><p className="text-sm text-stone-600">{c.content}</p></div></div>
                       </div>
                     ))}
@@ -173,21 +183,21 @@ function ObservatoireContent() {
           {filteredSpecies.map((s) => (
             <div key={s.id} className="bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden hover:shadow-xl transition-all group">
               <div className="relative h-64 bg-stone-100">
-                <img src={s.image_url} alt={s.name} className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
-                <div className={`absolute top-4 right-4 px-3 py-1 rounded-full text-[10px] font-bold text-white uppercase ${statusColors[s.conservation_status]}`}>{s.conservation_status}</div>
+                <Image src={s.image_url} alt={s.name} className="object-cover opacity-90 group-hover:opacity-100 transition-opacity" fill />
+                <div className={`absolute z-10 top-4 right-4 px-3 py-1 rounded-full text-[10px] font-bold text-white uppercase ${statusColors[s.conservation_status]}`}>{s.conservation_status}</div>
                 <button onClick={(e) => { e.stopPropagation(); toggleFavorite(s.id); }} className="absolute bottom-4 right-4 w-10 h-10 bg-white/90 backdrop-blur shadow-lg rounded-full flex items-center justify-center hover:scale-110 transition-all"><Heart className={`h-5 w-5 ${favorites.includes(s.id) ? 'text-red-500 fill-current' : 'text-stone-400'}`} /></button>
               </div>
-                              <div className="p-6">
-                                <h3 className="text-xl font-bold text-stone-900 mb-1">{s.name}</h3>
-                                <p className="text-sm italic text-stone-500 mb-4">{s.scientific_name}</p>
-                                <Link 
-                                  href={`/observatoire/${s.id}`}
-                                  className="block w-full py-3 bg-stone-900 text-white font-bold rounded-xl hover:bg-green-600 transition-colors text-center"
-                                >
-                                  Voir la fiche
-                                </Link>
-                              </div>
-              
+              <div className="p-6">
+                <h3 className="text-xl font-bold text-stone-900 mb-1">{s.name}</h3>
+                <p className="text-sm italic text-stone-500 mb-4">{s.scientific_name}</p>
+                <Link
+                  href={`/observatoire/${s.id}`}
+                  className="block w-full py-3 bg-stone-900 text-white font-bold rounded-xl hover:bg-green-600 transition-colors text-center"
+                >
+                  Voir la fiche
+                </Link>
+              </div>
+
             </div>
           ))}
         </div>

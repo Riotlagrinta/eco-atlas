@@ -6,7 +6,7 @@ import { motion } from 'framer-motion';
 interface TogoMapProps {
   activeRegion: string | null;
   onRegionClick: (region: string) => void;
-  regionalData: any[];
+  regionalData: { name: string, count: number }[];
 }
 
 export function TogoRegionalMap({ activeRegion, onRegionClick, regionalData }: TogoMapProps) {
@@ -40,7 +40,7 @@ export function TogoRegionalMap({ activeRegion, onRegionClick, regionalData }: T
           />
         ))}
       </svg>
-      
+
       {/* Tooltip flottant au survol */}
       <div className="absolute top-0 -right-12 space-y-2">
         {regions.map(r => (

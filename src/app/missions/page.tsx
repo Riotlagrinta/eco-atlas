@@ -2,8 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { Target, Users, Calendar, ArrowRight, Loader2, Trophy, MapPin, MessageSquare, Send, X } from 'lucide-react';
+import { Target, Users, Calendar, Loader2, Trophy, MessageSquare, Send, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Image from 'next/image';
 
 interface Mission {
   id: string;
@@ -15,11 +16,20 @@ interface Mission {
   status: string;
   end_date: string;
 }
+interface MissionMessage {
+  id: string;
+  content: string;
+  created_at: string;
+  profiles: {
+    full_name: string;
+    avatar_url: string | null;
+  } | null;
+}
 
 export default function MissionsPage() {
   const [missions, setMissions] = useState<Mission[]>([]);
   const [selectedMission, setSelectedMission] = useState<Mission | null>(null);
-  const [messages, setMessages] = useState<any[]>([]);
+  const [messages, setMessages] = useState<MissionMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
@@ -80,7 +90,7 @@ export default function MissionsPage() {
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
                 {messages.map((m) => (
                   <div key={m.id} className="flex gap-4">
-                    <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center overflow-hidden flex-shrink-0 border border-stone-200">{m.profiles?.avatar_url ? <img src={m.profiles.avatar_url} /> : <Users className="h-5 w-5 text-stone-300" />}</div>
+                    <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center overflow-hidden flex-shrink-0 border border-stone-200 relative">{m.profiles?.avatar_url ? <Image src={m.profiles.avatar_url} alt="Avatar" className="object-cover" fill /> : <Users className="h-5 w-5 text-stone-300" />}</div>
                     <div className="flex-1">
                       <div className="bg-stone-50 p-4 rounded-2xl rounded-tl-none border border-stone-100">
                         <p className="font-bold text-xs text-stone-900 mb-1">{m.profiles?.full_name}</p>
@@ -111,7 +121,7 @@ export default function MissionsPage() {
 
       {missions.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-          {missions.map((mission, index) => {
+          {missions.map((mission) => {
             const progress = (mission.current_count / mission.target_count) * 100;
             return (
               <motion.div
@@ -121,22 +131,22 @@ export default function MissionsPage() {
                 className="bg-white rounded-3xl border border-stone-100 shadow-xl overflow-hidden flex flex-col lg:flex-row h-full"
               >
                 <div className="lg:w-1/3 h-48 lg:h-auto relative bg-stone-100">
-                  <img src={mission.image_url || 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=800&q=80'} className="w-full h-full object-cover" alt="Mission" />
-                  <div className="absolute top-4 left-4 bg-green-600 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest">Actif</div>
+                  <Image src={mission.image_url || 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=800&q=80'} className="object-cover" alt="Mission" fill />
+                  <div className="absolute z-10 top-4 left-4 bg-green-600 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest">Actif</div>
                 </div>
-                
+
                 <div className="p-8 flex-1 flex flex-col justify-between">
                   <div>
                     <h3 className="text-2xl font-bold text-stone-900 mb-3">{mission.title}</h3>
                     <p className="text-stone-500 text-sm mb-6 leading-relaxed">{mission.description}</p>
-                    
+
                     <div className="space-y-4 mb-8">
                       <div className="flex justify-between text-xs font-bold text-stone-400 uppercase">
                         <span>Progression</span>
                         <span className="text-green-600">{mission.current_count} / {mission.target_count} signalements</span>
                       </div>
                       <div className="w-full h-3 bg-stone-100 rounded-full overflow-hidden border border-stone-50">
-                        <motion.div 
+                        <motion.div
                           initial={{ width: 0 }}
                           animate={{ width: `${progress}%` }}
                           className="h-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.4)]"
@@ -149,7 +159,7 @@ export default function MissionsPage() {
                     <div className="flex items-center text-stone-400 text-xs font-medium">
                       <Calendar className="h-4 w-4 mr-1" /> Expire le {new Date(mission.end_date).toLocaleDateString('fr-FR')}
                     </div>
-                    <button 
+                    <button
                       onClick={() => {
                         setSelectedMission(mission);
                         fetchMessages(mission.id);

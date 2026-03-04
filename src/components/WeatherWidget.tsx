@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Cloud, Sun, CloudRain, Wind, Thermometer, AlertTriangle, Loader2 } from 'lucide-react';
+import { Cloud, Sun, CloudRain, Wind, Loader2 } from 'lucide-react';
 
 const PARKS = [
   { name: 'Fazao-Malfakassa', lat: 8.85, lon: 0.95 },
@@ -9,8 +9,19 @@ const PARKS = [
   { name: 'Oti-Mandouri', lat: 10.82, lon: 0.65 }
 ];
 
+interface WeatherData {
+  name: string;
+  lat: number;
+  lon: number;
+  temp: number;
+  wind: number;
+  code: number;
+  risk: string;
+  riskColor: string;
+}
+
 export function WeatherWidget() {
-  const [weatherData, setWeatherData] = useState<any[]>([]);
+  const [weatherData, setWeatherData] = useState<WeatherData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -19,13 +30,13 @@ export function WeatherWidget() {
         const results = await Promise.all(PARKS.map(async (park) => {
           const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${park.lat}&longitude=${park.lon}&current_weather=true`);
           const data = await res.json();
-          
+
           // Logique de calcul du Risque Incendie (Simplifiée)
           const temp = data.current_weather.temperature;
           const wind = data.current_weather.windspeed;
           let risk = "Bas";
           let riskColor = "text-green-600 bg-green-50";
-          
+
           if (temp > 35 && wind > 20) { risk = "Critique"; riskColor = "text-red-600 bg-red-50 animate-pulse"; }
           else if (temp > 30 || wind > 15) { risk = "Élevé"; riskColor = "text-orange-600 bg-orange-50"; }
           else if (temp > 25) { risk = "Modéré"; riskColor = "text-yellow-600 bg-yellow-50"; }

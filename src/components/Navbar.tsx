@@ -2,19 +2,18 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, X, Leaf, Map, Film, Info, Camera, Shield, User, Newspaper, Bell, Clock, Globe, Target, Brain, ShieldCheck, Trees, LogIn, LogOut, ChevronRight } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Menu, X, Leaf, Map, Film, Info, Camera, Shield, User, Newspaper, Target, ShieldCheck, Trees, LogIn, LogOut, ChevronRight, Trophy } from 'lucide-react';
+
 import { createClient } from '@/lib/supabase/client';
 import { translations } from '@/lib/i18n';
 import { GlobalSearch } from '@/components/GlobalSearch';
+import { NotificationBell } from '@/components/NotificationBell';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export function Navbar() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<{ id: string } | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [showNotifs, setShowNotifs] = useState(false);
   const [lang, setLang] = useState<'fr' | 'ee' | 'kby'>('fr');
   const supabase = createClient();
 
@@ -44,10 +43,15 @@ export function Navbar() {
     checkUser();
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-      if (!session) { setIsAdmin(false); setNotifications([]); }
     });
     return () => subscription.unsubscribe();
   }, [supabase]);
+
+  const sidebarNavItems = [
+    ...mainNavItems,
+    { name: '🎮 Classement', href: '/classement', icon: Trophy },
+    { name: '🎯 Défis', href: '/defis', icon: Target },
+  ];
 
   return (
     <>
@@ -55,7 +59,7 @@ export function Navbar() {
       <nav className="fixed top-0 w-full z-[100] bg-white/80 backdrop-blur-md border-b border-stone-100 shadow-sm h-16">
         <div className="max-w-7xl mx-auto px-4 h-full flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button 
+            <button
               onClick={() => setIsSidebarOpen(true)}
               className="p-2 hover:bg-stone-100 rounded-xl transition-all text-stone-600"
             >
@@ -71,13 +75,10 @@ export function Navbar() {
 
           <div className="flex items-center gap-2 sm:gap-4">
             <GlobalSearch />
-            
+
             {user ? (
               <div className="flex items-center gap-2">
-                <button onClick={() => setShowNotifs(!showNotifs)} className="p-2 text-stone-400 hover:text-green-600 relative">
-                  <Bell className="h-5 w-5" />
-                  {notifications.length > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border border-white"></span>}
-                </button>
+                <NotificationBell />
                 <Link href="/profil" className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 border border-green-200">
                   <User className="h-4 w-4" />
                 </Link>
@@ -95,12 +96,12 @@ export function Navbar() {
       <AnimatePresence>
         {isSidebarOpen && (
           <>
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               onClick={() => setIsSidebarOpen(false)}
               className="fixed inset-0 bg-stone-900/40 backdrop-blur-sm z-[110]"
             />
-            <motion.aside 
+            <motion.aside
               initial={{ x: '-100%' }} animate={{ x: 0 }} exit={{ x: '-100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className="fixed top-0 left-0 bottom-0 w-72 bg-white z-[120] shadow-2xl flex flex-col"
@@ -117,9 +118,9 @@ export function Navbar() {
 
               <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
                 {mainNavItems.map((item) => (
-                  <Link 
-                    key={item.href} 
-                    href={item.href} 
+                  <Link
+                    key={item.href}
+                    href={item.href}
                     onClick={() => setIsSidebarOpen(false)}
                     className="flex items-center justify-between p-3 rounded-xl text-stone-600 hover:text-green-600 hover:bg-green-50 transition-all group font-medium"
                   >
@@ -152,12 +153,12 @@ export function Navbar() {
                   <span className="text-[10px] font-bold text-stone-400 uppercase tracking-widest">Langue</span>
                   <div className="flex gap-1">
                     {['fr', 'ee', 'kby'].map(l => (
-                      <button key={l} onClick={() => setLang(l as any)} className={`text-[9px] px-2 py-1 rounded font-bold uppercase transition-all ${lang === l ? 'bg-green-600 text-white' : 'text-stone-400 hover:text-stone-600'}`}>{l}</button>
+                      <button key={l} onClick={() => setLang(l as 'fr' | 'ee' | 'kby')} className={`text-[9px] px-2 py-1 rounded font-bold uppercase transition-all ${lang === l ? 'bg-green-600 text-white' : 'text-stone-400 hover:text-stone-600'}`}>{l}</button>
                     ))}
                   </div>
                 </div>
                 {user && (
-                  <button 
+                  <button
                     onClick={() => { supabase.auth.signOut(); setIsSidebarOpen(false); }}
                     className="w-full py-3 rounded-xl border border-red-100 text-red-600 font-bold text-xs flex items-center justify-center gap-2 hover:bg-red-50 transition-all"
                   >

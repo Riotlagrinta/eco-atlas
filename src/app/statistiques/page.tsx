@@ -2,23 +2,51 @@
 
 import React, { useState, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
-import { BarChart3, PieChart, Activity, ShieldCheck, Leaf, Users, Loader2, ArrowUpRight, Trophy, Globe, Map as MapIcon } from 'lucide-react';
-import { motion } from 'framer-motion';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as ChartTooltip, Cell, LineChart, Line, CartesianGrid } from 'recharts';
+import { BarChart3, PieChart, Activity, ShieldCheck, Leaf, Users, Loader2, ArrowUpRight, Trophy, Globe } from 'lucide-react';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Cell, LineChart, Line, CartesianGrid } from 'recharts';
 import { TogoRegionalMap } from '@/components/TogoRegionalMap';
+
+interface StatChartData {
+  name: string;
+  count?: number;
+  color?: string;
+  signalements?: number;
+}
+
+interface LeaderboardUser {
+  full_name: string;
+  role: string;
+  observations: { count: number }[];
+}
+
+interface RegionRank {
+  name: string;
+  count: number;
+}
+
+interface StatsData {
+  speciesCount: number;
+  protectedCount: number;
+  obsCount: number;
+  userCount: number;
+  byStatus: StatChartData[];
+  trends: StatChartData[];
+  leaderboard: LeaderboardUser[];
+  regionalRank: RegionRank[];
+}
 
 export default function StatistiquesPage() {
   const [loading, setLoading] = useState(true);
   const [selectedRegion, setSelectedRegion] = useState<string | null>(null);
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<StatsData>({
     speciesCount: 0,
     protectedCount: 0,
     obsCount: 0,
     userCount: 0,
-    byStatus: [] as any[],
-    trends: [] as any[],
-    leaderboard: [] as any[],
-    regionalRank: [] as any[]
+    byStatus: [],
+    trends: [],
+    leaderboard: [],
+    regionalRank: []
   });
 
   const supabase = createClient();
@@ -46,8 +74,8 @@ export default function StatistiquesPage() {
       ]);
 
       // Calcul par région
-      const regMap: any = {};
-      regData?.forEach((p: any) => {
+      const regMap: Record<string, number> = {};
+      regData?.forEach((p: { region: string, observations?: { count: number }[] }) => {
         if (p.region) {
           regMap[p.region] = (regMap[p.region] || 0) + (p.observations?.[0]?.count || 0);
         }
@@ -57,10 +85,10 @@ export default function StatistiquesPage() {
       // Calcul des tendances par mois
       const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
       const currentYear = new Date().getFullYear();
-      const trendMap: any = {};
+      const trendMap: Record<string, number> = {};
       months.forEach(m => trendMap[m] = 0);
-      
-      obsData?.forEach((o: any) => {
+
+      obsData?.forEach((o: { created_at: string }) => {
         const date = new Date(o.created_at);
         if (date.getFullYear() === currentYear) {
           trendMap[months[date.getMonth()]]++;
@@ -68,8 +96,8 @@ export default function StatistiquesPage() {
       });
       const trendData = months.map(m => ({ name: m, signalements: trendMap[m] }));
 
-      const statusCount: any = { CR: 0, EN: 0, VU: 0, NT: 0, LC: 0 };
-      speciesData?.forEach((s: any) => {
+      const statusCount: Record<string, number> = { CR: 0, EN: 0, VU: 0, NT: 0, LC: 0 };
+      speciesData?.forEach((s: { conservation_status: string }) => {
         if (statusCount[s.conservation_status] !== undefined) statusCount[s.conservation_status]++;
       });
 
@@ -132,9 +160,9 @@ export default function StatistiquesPage() {
               <Globe className="h-5 w-5 mr-2 text-green-600" /> Ligue des Régions du Togo
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {stats.regionalRank.sort((a,b) => b.count - a.count).map((reg, i) => (
-                <div 
-                  key={i} 
+              {stats.regionalRank.sort((a, b) => b.count - a.count).map((reg, i) => (
+                <div
+                  key={i}
                   onClick={() => setSelectedRegion(reg.name === selectedRegion ? null : reg.name)}
                   className={cn(
                     "p-6 rounded-2xl border transition-all cursor-pointer",
@@ -147,12 +175,12 @@ export default function StatistiquesPage() {
               ))}
             </div>
           </div>
-          
+
           <div className="w-full lg:w-1/3 flex flex-col items-center">
-            <TogoRegionalMap 
-              activeRegion={selectedRegion} 
-              onRegionClick={(r) => setSelectedRegion(r === selectedRegion ? null : r)} 
-              regionalData={stats.regionalRank} 
+            <TogoRegionalMap
+              activeRegion={selectedRegion}
+              onRegionClick={(r) => setSelectedRegion(r === selectedRegion ? null : r)}
+              regionalData={stats.regionalRank}
             />
             <p className="text-[10px] text-stone-400 mt-6 font-bold uppercase tracking-widest italic">Carte interactive du territoire</p>
           </div>
@@ -229,12 +257,11 @@ export default function StatistiquesPage() {
             <ShieldCheck className="h-5 w-5 mr-2" /> Rapport PDF
           </button>
         </div>
-            </div>
-          </div>
-        );
-      }
-      
-      function cn(...classes: string[]) {
-        return classes.filter(Boolean).join(' ');
-      }
-      
+      </div>
+    </div>
+  );
+}
+
+function cn(...classes: string[]) {
+  return classes.filter(Boolean).join(' ');
+}

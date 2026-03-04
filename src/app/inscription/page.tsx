@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+
 import { createClient } from '@/lib/supabase/client';
 import { Leaf, Mail, Lock, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -14,7 +14,7 @@ export default function InscriptionPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const router = useRouter();
+
   const supabase = createClient();
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -48,7 +48,7 @@ export default function InscriptionPage() {
   if (success) {
     return (
       <div className="min-h-[calc(100vh-64px)] flex items-center justify-center p-4 bg-stone-50">
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           className="max-w-md w-full bg-white p-10 rounded-3xl shadow-xl text-center border border-stone-100"
@@ -58,11 +58,11 @@ export default function InscriptionPage() {
           </div>
           <h1 className="text-2xl font-bold text-stone-900 mb-4">Vérifiez vos e-mails !</h1>
           <p className="text-stone-600 leading-relaxed mb-8">
-            Nous avons envoyé un lien de confirmation à <span className="font-bold text-stone-900">{email}</span>. 
+            Nous avons envoyé un lien de confirmation à <span className="font-bold text-stone-900">{email}</span>.
             Veuillez cliquer sur le lien pour activer votre compte.
           </p>
-          <Link 
-            href="/connexion" 
+          <Link
+            href="/connexion"
             className="inline-block bg-stone-900 text-white font-bold px-8 py-3 rounded-xl hover:bg-stone-800 transition-colors"
           >
             Aller à la page de connexion
@@ -74,7 +74,7 @@ export default function InscriptionPage() {
 
   return (
     <div className="min-h-[calc(100vh-64px)] flex items-center justify-center p-4 bg-stone-50">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         className="max-w-md w-full bg-white rounded-3xl shadow-xl shadow-stone-200/50 border border-stone-100 overflow-hidden"
