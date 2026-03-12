@@ -338,6 +338,26 @@ export const documentaryComments = pgTable('documentary_comments', {
   createdAt: timestamp('created_at').defaultNow(),
 });
 
+export const missionMessages = pgTable('mission_messages', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  missionId: uuid('mission_id').references(() => missions.id, { onDelete: 'cascade' }),
+  userId: uuid('user_id').references(() => users.id, { onDelete: 'cascade' }),
+  content: text('content').notNull(),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
+export const events = pgTable('events', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  title: text('title').notNull(),
+  description: text('description'),
+  eventDate: timestamp('event_date').notNull(),
+  location: text('location'),
+  latitude: doublePrecision('latitude'),
+  longitude: doublePrecision('longitude'),
+  imageUrl: text('image_url'),
+  createdAt: timestamp('created_at').defaultNow(),
+});
+
 export const pushSubscriptions = pgTable('push_subscriptions', {
   id: uuid('id').defaultRandom().primaryKey(),
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),

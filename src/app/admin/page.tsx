@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
-import { Shield, Plus, Upload, Loader2, CheckCircle, AlertCircle, Trash2, Leaf, Camera, Map as MapIcon, Newspaper, Users, BarChart3, Edit3, MessageSquare, X, FileText, Film } from 'lucide-react';
+import { Shield, Plus, Upload, Loader2, CheckCircle, AlertCircle, Trash2, Leaf, Camera, Map as MapIcon, Newspaper, Users, BarChart3, Edit3, MessageSquare, X, FileText, Film, QrCode } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';

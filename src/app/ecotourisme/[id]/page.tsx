@@ -10,10 +10,7 @@ import Image from 'next/image';
 import { BookingForm } from '@/components/BookingForm';
 import { getTrailById, getAllGuides } from '@/lib/actions';
 
-const TrailMap = dynamic(() => import('@/components/TrailMap'), {
-  ssr: false,
-  loading: () => <div className="h-full bg-stone-100 animate-pulse" />
-});
+import { DynamicTrailMap } from '@/components/DynamicTrailMap';
 
 export default async function TrailDetailPage({ params }: { params: { id: string } }) {
   const { id } = await params;
@@ -74,7 +71,7 @@ export default async function TrailDetailPage({ params }: { params: { id: string
                 <MapIcon className="h-5 w-5 text-blue-600" /> Tracé de l'itinéraire
               </h3>
               <div className="h-[500px] rounded-[40px] overflow-hidden border border-stone-200 shadow-2xl">
-                <TrailMap geoJsonData={trail.location} />
+                <DynamicTrailMap geoJsonData={trail.location} />
               </div>
             </div>
 

@@ -95,7 +95,7 @@ function ObservatoireContent() {
 
       if (session?.user) {
         const favData = await getFavorites();
-        setFavorites(favData);
+        setFavorites(favData.map((f: any) => f.id));
       }
       setLoading(false);
     }

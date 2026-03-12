@@ -8,10 +8,7 @@ import { VotePanel } from '@/components/VotePanel';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 
-const MiniMap = dynamic(() => import('@/components/Map'), {
-  ssr: false,
-  loading: () => <div className="h-full bg-stone-100 animate-pulse" />
-});
+import { DynamicMap } from '@/components/DynamicMap';
 
 const statusColors: Record<string, string> = {
   'CR': 'bg-red-600', 'EN': 'bg-orange-600', 'VU': 'bg-yellow-500', 'NT': 'bg-blue-500', 'LC': 'bg-green-500',
@@ -90,7 +87,7 @@ export default async function SpeciesDetailPage({ params }: { params: { id: stri
               <MapPin className="h-5 w-5 mr-2 text-green-600" /> Zone d&apos;observation au Togo
             </h3>
             <div className="h-80 rounded-3xl overflow-hidden border border-stone-200 shadow-inner">
-              <MiniMap filter="species" />
+              <DynamicMap filter="species" />
             </div>
           </div>
 

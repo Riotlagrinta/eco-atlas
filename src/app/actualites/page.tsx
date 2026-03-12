@@ -11,9 +11,9 @@ interface Article {
   id: string;
   title: string;
   content: string;
-  image_url: string | null;
+  imageUrl: string | null;
   category: string | null;
-  created_at: Date | null;
+  createdAt: Date | null;
 }
 
 interface ArticleComment {
@@ -54,7 +54,7 @@ export default function ActualitesPage() {
 
     if (!session?.user) return alert("Connectez-vous pour commenter !");
 
-    const res = await addComment(selectedArticle!.id, newComment);
+    const res = await addComment({ articleId: selectedArticle!.id, content: newComment });
 
     if (res.success) {
       setNewComment('');
@@ -79,7 +79,7 @@ export default function ActualitesPage() {
               className="bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl relative border border-stone-200"
             >
               <div className="relative h-64 md:h-80">
-                <Image src={selectedArticle.image_url || ''} className="object-cover" alt="Article" fill />
+                <Image src={selectedArticle.imageUrl || ''} className="object-cover" alt="Article" fill />
                 <button onClick={() => setSelectedArticle(null)} className="absolute top-4 right-4 bg-white shadow-lg p-2 rounded-full hover:bg-stone-100 transition-all z-10"><X className="h-6 w-6" /></button>
               </div>
 
@@ -161,7 +161,7 @@ export default function ActualitesPage() {
             >
               <div className="relative h-64 overflow-hidden bg-stone-100">
                 <Image
-                  src={article.image_url || 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=800&q=80'}
+                  src={article.imageUrl || 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=800&q=80'}
                   alt={article.title}
                   className="object-cover group-hover:scale-105 transition-transform duration-500"
                   fill
@@ -173,7 +173,7 @@ export default function ActualitesPage() {
 
               <div className="p-8">
                 <div className="flex items-center text-stone-400 text-xs mb-4 space-x-4">
-                  <span className="flex items-center"><Calendar className="h-3 w-3 mr-1" /> {article.created_at ? new Date(article.created_at).toLocaleDateString('fr-FR') : ''}</span>
+                  <span className="flex items-center"><Calendar className="h-3 w-3 mr-1" /> {article.createdAt ? new Date(article.createdAt).toLocaleDateString('fr-FR') : ''}</span>
                 </div>
                 <h3 className="text-xl font-bold text-stone-900 mb-4 group-hover:text-green-600 transition-colors line-clamp-2">
                   {article.title}

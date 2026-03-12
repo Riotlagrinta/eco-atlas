@@ -1,7 +1,7 @@
 'use server';
 
 import { db } from '@/lib/db';
-import { articles, observations, species, challenges, users, userLevels, comments, favorites, apiKeys, apiLogs, forumThreads, forumReplies, documents, documentaries, bookings, votes, observationVotes, ecoTrails, localGuides, protectedAreas, missions, missionMessages, notifications, pushSubscriptions } from '@/lib/db/schema';
+import { articles, observations, species, challenges, users, userLevels, comments, favorites, apiKeys, apiLogs, forumThreads, forumReplies, documents, documentaries, bookings, votes, observationVotes, ecoTrails, localGuides, protectedAreas, missions, missionMessages, notifications, pushSubscriptions, quizzes, questions, quizResults, events } from '@/lib/db/schema';
 import { desc, eq, and, sql, not, ilike } from 'drizzle-orm';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
@@ -588,35 +588,86 @@ export async function updateUserRole(userId: string, role: string) {
 
 // --- Dashboard Stats ---
 export async function getDashboardStats() {
-  await ensureAdmin();
-  try {
-      const obsData = await db.query.observations.findMany({
-          columns: { createdAt: true, isVerified: true, type: true }
-      });
-      const userData = await db.query.users.findMany({
-          columns: { createdAt: true, region: true }
-      });
+    try {
+        const [obsData, userData, speciesData, protectedData] = await Promise.all([
+            db.query.observations.findMany({
+                columns: { id: true, createdAt: true, isVerified: true, type: true, userId: true }
+            }),
+            db.query.users.findMany({
+                columns: { id: true, createdAt: true, region: true, name: true, image: true, role: true }
+            }),
+            db.query.species.findMany({
+                columns: { conservationStatus: true }
+            }),
+            db.query.protectedAreas.findMany({
+                columns: { id: true }
+            })
+        ]);
 
-      const regionStats: Record<string, number> = {};
-      userData.forEach(u => {
-          const r = u.region || 'Inconnue';
-          regionStats[r] = (regionStats[r] || 0) + 1;
-      });
+        const regionStats: Record<string, number> = {};
+        userData.forEach(u => {
+            const r = u.region || 'Inconnue';
+            regionStats[r] = (regionStats[r] || 0) + 1;
+        });
 
-      const totalAlerts = obsData.filter(o => o.type === 'alert').length;
-      const verifiedObs = obsData.filter(o => o.isVerified).length;
+        const totalAlerts = obsData.filter(o => o.type === 'alert').length;
+        const verifiedObs = obsData.filter(o => o.isVerified).length;
 
-      return {
-          totalObservations: obsData.length,
-          totalAlerts,
-          verifiedObs,
-          totalUsers: userData.length,
-          byRegion: Object.entries(regionStats).map(([name, count]) => ({ name, count })),
-      };
-  } catch (error) {
-      console.error('Error fetching dashboard stats:', error);
-      return null;
-  }
+        // --- Trends (Monthly) ---
+        const trends = Array.from({ length: 6 }, (_, i) => {
+            const date = new Date();
+            date.setMonth(date.getMonth() - (5 - i));
+            const monthName = date.toLocaleString('fr-FR', { month: 'short' });
+            const count = obsData.filter(o => {
+                const obsDate = o.createdAt ? new Date(o.createdAt) : new Date();
+                return obsDate.getMonth() === date.getMonth() && obsDate.getFullYear() === date.getFullYear();
+            }).length;
+            return { name: monthName, signalements: count };
+        });
+
+        // --- Leaderboard ---
+        const userObsCount: Record<string, number> = {};
+        obsData.forEach(o => {
+            if (o.userId) userObsCount[o.userId] = (userObsCount[o.userId] || 0) + 1;
+        });
+        const leaderboard = userData
+            .map(u => ({ ...u, full_name: u.name, obs_count: userObsCount[u.id] || 0 }))
+            .sort((a, b) => b.obs_count - a.obs_count)
+            .slice(0, 5);
+
+        // --- Conservation Status Distribution ---
+        const statusMap: Record<string, number> = {};
+        speciesData.forEach(s => {
+            if (s.conservationStatus) statusMap[s.conservationStatus] = (statusMap[s.conservationStatus] || 0) + 1;
+        });
+        const statusColors: Record<string, string> = {
+            'CR': '#dc2626', 'EN': '#ea580c', 'VU': '#eab308', 'NT': '#3b82f6', 'LC': '#22c55e',
+        };
+        const byStatus = Object.entries(statusMap).map(([name, count]) => ({
+            name,
+            count,
+            color: statusColors[name] || '#94a3b8'
+        }));
+
+        return {
+            totalObservations: obsData.length,
+            totalAlerts,
+            verifiedObs,
+            totalUsers: userData.length,
+            byRegion: Object.entries(regionStats).map(([name, count]) => ({ name, count })),
+            regionalRank: Object.entries(regionStats).map(([name, count]) => ({ name, count })),
+            speciesCount: speciesData.length,
+            protectedCount: protectedData.length,
+            obsCount: verifiedObs,
+            userCount: userData.length,
+            trends,
+            leaderboard,
+            byStatus
+        };
+    } catch (error) {
+        console.error('Error fetching dashboard stats:', error);
+        return null;
+    }
 }
 
 // --- Forum (Community) ---
@@ -825,3 +876,243 @@ export async function getUserFavorites() {
     return [];
   }
 }
+
+// --- Generic Comments ---
+export async function getComments(articleId?: string, speciesId?: string) {
+    try {
+        const where = articleId ? eq(comments.articleId, articleId) : speciesId ? eq(comments.speciesId, speciesId) : undefined;
+        return await db.query.comments.findMany({
+            where,
+            with: { user: { columns: { name: true, image: true } } },
+            orderBy: [desc(comments.createdAt)],
+        });
+    } catch (error) {
+        console.error('Error fetching comments:', error);
+        return [];
+    }
+}
+
+export async function addComment(data: { articleId?: string, speciesId?: string, content: string }) {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error('Unauthorized');
+    try {
+        await db.insert(comments).values({ 
+            ...data, 
+            userId: session.user.id 
+        });
+        if (data.articleId) revalidatePath(`/actualites/${data.articleId}`);
+        if (data.speciesId) revalidatePath(`/observatoire/${data.speciesId}`);
+        return { success: true };
+    } catch (error) {
+        console.error('Error adding comment:', error);
+        return { success: false, error };
+    }
+}
+
+// --- Observations Management ---
+export async function deleteObservation(id: string) {
+    await ensureAdmin();
+    try {
+        await db.delete(observations).where(eq(observations.id, id));
+        revalidatePath('/admin');
+        revalidatePath('/observatoire');
+        return { success: true };
+    } catch (error) {
+        console.error('Error deleting observation:', error);
+        return { success: false, error };
+    }
+}
+
+export async function getMapObservations() {
+    try {
+        return await db.query.observations.findMany({
+            where: eq(observations.type, 'observation'),
+            orderBy: [desc(observations.createdAt)],
+            with: {
+                species: { columns: { name: true } }
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching map observations:', error);
+        return [];
+    }
+}
+
+// --- GeoJSON Helpers ---
+export async function getProtectedAreasGeoJSON() {
+    const areas = await getAllProtectedAreas();
+    return {
+        type: 'FeatureCollection',
+        features: areas.map(a => ({
+            type: 'Feature',
+            id: a.id,
+            properties: { name: a.name, type: a.type },
+            geometry: a.location ? JSON.parse(a.location) : null
+        }))
+    };
+}
+
+export async function getVerifiedObservationsGeoJSON() {
+    const obs = await db.query.observations.findMany({
+        where: eq(observations.isVerified, true)
+    });
+    return {
+        type: 'FeatureCollection',
+        features: obs.map(o => ({
+            type: 'Feature',
+            id: o.id,
+            properties: { description: o.description },
+            geometry: { type: 'Point', coordinates: [o.longitude, o.latitude] }
+        }))
+    };
+}
+
+// --- Quizzes ---
+export async function getAllQuizzes() {
+    try {
+        return await db.query.quizzes.findMany({
+            orderBy: [desc(quizzes.createdAt)]
+        });
+    } catch (error) {
+        console.error('Error fetching quizzes:', error);
+        return [];
+    }
+}
+
+export async function getQuizQuestions(quizId: string) {
+    try {
+        return await db.query.questions.findMany({
+            where: eq(questions.quizId, quizId)
+        });
+    } catch (error) {
+        console.error('Error fetching questions:', error);
+        return [];
+    }
+}
+
+export async function saveQuizResult(data: { quizId: string, score: number, totalQuestions: number }) {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error('Unauthorized');
+    try {
+        await db.insert(quizResults).values({ 
+            ...data, 
+            userId: session.user.id 
+        });
+        return { success: true };
+    } catch (error) {
+        console.error('Error saving quiz result:', error);
+        return { success: false, error };
+    }
+}
+
+// --- Gallery ---
+export async function getGalleryPhotos() {
+    try {
+        return await db.query.observations.findMany({
+            where: sql`${observations.imageUrl} IS NOT NULL`,
+            orderBy: [desc(observations.createdAt)],
+            limit: 50
+        });
+    } catch (error) {
+        console.error('Error fetching gallery photos:', error);
+        return [];
+    }
+}
+
+// --- Global Search ---
+export async function getGlobalSearchData() {
+    try {
+        const [obs, spec, art] = await Promise.all([
+            db.query.observations.findMany({ limit: 20 }),
+            db.query.species.findMany({ limit: 20 }),
+            db.query.articles.findMany({ limit: 20 })
+        ]);
+        return { observations: obs, species: spec, articles: art };
+    } catch (error) {
+        console.error('Error fetching global search data:', error);
+        return { observations: [], species: [], articles: [] };
+    }
+}
+
+// --- Profile & User Management ---
+export async function getProfileData() {
+    const session = await auth();
+    if (!session?.user?.id) return null;
+    try {
+        const [level, obs, favs] = await Promise.all([
+            db.query.userLevels.findFirst({ where: eq(userLevels.userId, session.user.id) }),
+            db.query.observations.findMany({ where: eq(observations.userId, session.user.id) }),
+            getUserFavorites()
+        ]);
+        return { level, observations: obs, favorites: favs };
+    } catch (error) {
+        console.error('Error fetching profile data:', error);
+        return null;
+    }
+}
+
+export async function updateProfile(data: { name?: string, image?: string, region?: string }) {
+    const session = await auth();
+    if (!session?.user?.id) throw new Error('Unauthorized');
+    try {
+        await db.update(users).set(data).where(eq(users.id, session.user.id));
+        revalidatePath('/profil');
+        return { success: true };
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        return { success: false, error };
+    }
+}
+
+// --- Single Items Fetch ---
+export async function getProtectedAreaById(id: string) {
+    try {
+        return await db.query.protectedAreas.findFirst({
+            where: eq(protectedAreas.id, id)
+        });
+    } catch (error) {
+        console.error('Error fetching protected area:', error);
+        return null;
+    }
+}
+
+export async function getSpeciesById(id: string) {
+    try {
+        return await db.query.species.findFirst({
+            where: eq(species.id, id),
+            with: {
+                observations: {
+                    with: {
+                        user: { columns: { name: true, image: true } }
+                    }
+                },
+                comments: {
+                    with: {
+                        user: { columns: { name: true, image: true } }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching species:', error);
+        return null;
+    }
+}
+
+export async function getUpcomingEvents() {
+    try {
+        return await db.query.events.findMany({
+            where: sql`${events.eventDate} >= NOW()`,
+            orderBy: [desc(events.eventDate)],
+            limit: 10
+        });
+    } catch (error) {
+        console.error('Error fetching events:', error);
+        return [];
+    }
+}
+
+// --- Exports Aliases for Compatibility ---
+export const getNotifications = getAllNotifications;
+export const getFavorites = getUserFavorites;
+export const getStatistics = getDashboardStats;

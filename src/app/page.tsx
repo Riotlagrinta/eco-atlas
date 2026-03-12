@@ -29,7 +29,7 @@ async function DirectDuTerrain() {
       <div className="flex space-x-6 overflow-x-auto pb-8 px-4 scrollbar-hide">
         {latestObs.map((obs) => (
           <div key={obs.id} className="min-w-[280px] h-80 relative rounded-3xl overflow-hidden shadow-xl border border-stone-100 group">
-            <Image src={obs.image_url || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'} alt="Observation" fill className="object-cover group-hover:scale-110 transition-transform duration-700" />
+            <Image src={obs.imageUrl || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'} alt="Observation" fill className="object-cover group-hover:scale-110 transition-transform duration-700" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-6 z-10">
               <span className="text-[10px] font-bold text-green-400 uppercase tracking-widest mb-1">{obs.species?.name || "Espèce inconnue"}</span>
               <p className="text-white text-sm font-medium line-clamp-2">{obs.description}</p>
@@ -62,7 +62,7 @@ async function Actualites(t: any) {
           {latestArticles.map((article) => (
             <Link key={article.id} href="/actualites" className="group">
               <div className="aspect-video rounded-2xl overflow-hidden bg-stone-100 mb-4 border border-stone-100 transition-all group-hover:shadow-lg relative">
-                <Image src={article.image_url || ''} className="object-cover group-hover:scale-105 transition-transform duration-500" alt="News" fill />
+                <Image src={article.imageUrl || ''} className="object-cover group-hover:scale-105 transition-transform duration-500" alt="News" fill />
               </div>
               <h4 className="font-bold text-stone-900 group-hover:text-green-600 transition-colors line-clamp-2">{article.title}</h4>
               <p className="text-[10px] text-stone-400 mt-2 font-bold uppercase tracking-widest">{article.category}</p>

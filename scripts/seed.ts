@@ -20,18 +20,18 @@ async function seed() {
     {
       name: 'Éléphant d’Afrique',
       scientificName: 'Loxodonta africana',
-      category: 'faune',
+      category: 'Fauna',
       conservationStatus: 'VU',
       description: 'Le plus grand mammifère terrestre, menacé par le braconnage.',
     },
     {
       name: 'Baobab Africain',
       scientificName: 'Adansonia digitata',
-      category: 'flore',
+      category: 'Flora',
       conservationStatus: 'LC',
       description: 'Arbre emblématique de la savane, capable de stocker des milliers de litres d’eau.',
     }
-  ];
+  ] as any[];
 
   console.log('Inserting species...');
   await db.insert(schema.species).values(speciesData).onConflictDoNothing();
