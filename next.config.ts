@@ -1,20 +1,43 @@
 import type { NextConfig } from "next";
 
-import "@ducanh2912/next-pwa";
-const withPWA = require("@ducanh2912/next-pwa").default({
-  dest: 'public',
-  register: true,
-  skipWaiting: true,
-  disable: process.env.NODE_ENV === 'development'
-});
-
 const nextConfig: NextConfig = {
-  turbopack: {},
+  compress: true,
+  poweredByHeader: false,
+  reactStrictMode: true,
   images: {
     remotePatterns: [
-      { protocol: 'https', hostname: '**' }
-    ]
-  }
+      {
+        protocol: 'https',
+        hostname: '**', // À restreindre plus tard pour la sécurité
+      },
+    ],
+  },
+  // Headers de sécurité recommandés
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block',
+          },
+          {
+            key: 'Referrer-Policy',
+            value: 'strict-origin-when-cross-origin',
+          },
+        ],
+      },
+    ];
+  },
 };
 
-export default withPWA(nextConfig);
+export default nextConfig;
