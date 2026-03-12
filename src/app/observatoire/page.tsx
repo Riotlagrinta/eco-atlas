@@ -3,16 +3,14 @@
 import React, { useEffect, useState, Suspense, useCallback } from 'react';
 import { Leaf, Search, Loader2, X, Share2, Heart, MessageSquare, Send, User, MapPin, Trees } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import nextDynamic from 'next/dynamic';
+import loadDynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSession } from 'next-auth/react';
 import { getAllSpecies, getSpeciesComments, addSpeciesComment, getFavorites, toggleFavorite as toggleFavAction } from '@/lib/actions';
 
-export const dynamic = "force-dynamic";
-
-const MiniMap = nextDynamic(() => import('@/components/Map'), {
+const MiniMap = loadDynamic(() => import('@/components/Map'), {
   ssr: false,
   loading: () => <div className="h-full bg-stone-100 animate-pulse" />
 });

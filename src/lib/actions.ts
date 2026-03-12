@@ -6,6 +6,44 @@ import { desc, eq, and, sql, not, ilike } from 'drizzle-orm';
 import { auth } from '@/auth';
 import { revalidatePath } from 'next/cache';
 import { v4 as uuidv4 } from 'uuid';
+import { z } from 'zod';
+
+// --- VALIDATION SCHEMAS ---
+
+const profileSchema = z.object({
+    name: z.string().min(2).max(50).optional(),
+    image: z.string().url().optional().or(z.literal('')),
+    region: z.string().max(50).optional(),
+});
+
+const observationSchema = z.object({
+    speciesId: z.string().uuid().optional().nullable(),
+    description: z.string().min(10).max(1000),
+    imageUrl: z.string().url().optional(),
+    location: z.string().optional(),
+    latitude: z.number().optional(),
+    longitude: z.number().optional(),
+    type: z.enum(['observation', 'alert']).default('observation'),
+    alertLevel: z.enum(['low', 'medium', 'high', 'critical']).optional(),
+});
+
+const forumThreadSchema = z.object({
+    title: z.string().min(5).max(100),
+    content: z.string().min(20).max(5000),
+    category: z.string().min(2).max(30),
+});
+
+const commentSchema = z.object({
+    articleId: z.string().uuid().optional(),
+    speciesId: z.string().uuid().optional(),
+    content: z.string().min(1).max(1000),
+});
+
+const bookingSchema = z.object({
+    trailId: z.string().uuid(),
+    bookingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    participants: z.number().int().min(1).max(20),
+});
 
 // --- Auth Check ---
 async function ensureAdmin() {
@@ -52,7 +90,9 @@ export async function markNotificationAsRead(id: string) {
     const session = await auth();
     if (!session?.user?.id) throw new Error('Unauthorized');
     try {
-        await db.update(notifications).set({ isRead: true }).where(eq(notifications.id, id));
+        await db.update(notifications)
+            .set({ isRead: true })
+            .where(and(eq(notifications.id, id), eq(notifications.userId, session.user.id)));
         revalidatePath('/notifications');
         return { success: true };
     } catch (error) {
@@ -65,7 +105,9 @@ export async function markAllNotificationsAsRead() {
     const session = await auth();
     if (!session?.user?.id) throw new Error('Unauthorized');
     try {
-        await db.update(notifications).set({ isRead: true }).where(eq(notifications.userId, session.user.id));
+        await db.update(notifications)
+            .set({ isRead: true })
+            .where(eq(notifications.userId, session.user.id));
         revalidatePath('/notifications');
         return { success: true };
     } catch (error) {
@@ -79,8 +121,10 @@ export async function savePushSubscription(data: any) {
     if (!session?.user?.id) throw new Error('Unauthorized');
     try {
         await db.insert(pushSubscriptions).values({
-            ...data,
-            userId: session.user.id
+            userId: session.user.id,
+            endpoint: data.endpoint,
+            p256dh: data.p256dh,
+            auth: data.auth,
         }).onConflictDoUpdate({
             target: [pushSubscriptions.userId, pushSubscriptions.endpoint],
             set: { p256dh: data.p256dh, auth: data.auth }
@@ -113,7 +157,7 @@ export async function createApiKey(name: string) {
         await db.insert(apiKeys).values({
             userId: session?.user?.id,
             key: newKey,
-            name,
+            name: name.substring(0, 50),
             isActive: true
         });
         revalidatePath('/admin/api-keys');
@@ -177,7 +221,10 @@ export async function createArticle(data: { title: string, content: string, imag
   const session = await auth();
   try {
     await db.insert(articles).values({
-      ...data,
+      title: data.title,
+      content: data.content,
+      imageUrl: data.imageUrl,
+      category: data.category,
       authorId: session?.user?.id,
     });
     revalidatePath('/actualites');
@@ -217,7 +264,13 @@ export async function getAllDocuments() {
 export async function createDocument(data: any) {
     await ensureAdmin();
     try {
-        await db.insert(documents).values(data);
+        await db.insert(documents).values({
+            title: data.title,
+            description: data.description,
+            category: data.category,
+            fileUrl: data.fileUrl,
+            sizeMb: data.sizeMb
+        });
         revalidatePath('/documentation');
         revalidatePath('/admin');
         return { success: true };
@@ -277,10 +330,21 @@ export async function getAllProtectedAreas() {
 export async function upsertProtectedArea(data: any) {
     await ensureAdmin();
     try {
+        const cleanData = {
+            name: data.name,
+            surfaceArea: data.surfaceArea,
+            establishedYear: data.establishedYear,
+            description: data.description,
+            imageUrl: data.imageUrl,
+            type: data.type,
+            areaKm2: data.areaKm2,
+            location: data.location
+        };
+
         if (data.id) {
-            await db.update(protectedAreas).set(data).where(eq(protectedAreas.id, data.id));
+            await db.update(protectedAreas).set(cleanData).where(eq(protectedAreas.id, data.id));
         } else {
-            await db.insert(protectedAreas).values(data);
+            await db.insert(protectedAreas).values(cleanData);
         }
         revalidatePath('/admin/carte');
         revalidatePath('/carte');
@@ -342,7 +406,7 @@ export async function sendMissionMessage(missionId: string, content: string) {
         await db.insert(missionMessages).values({
             missionId,
             userId: session.user.id,
-            content
+            content: content.substring(0, 500) // Limitation de taille
         });
         revalidatePath('/missions');
         return { success: true };
@@ -390,21 +454,23 @@ export async function getAllObservations() {
   }
 }
 
-export async function createObservation(data: {
-  speciesId?: string | null,
-  description: string,
-  imageUrl?: string,
-  location?: string,
-  latitude?: number,
-  longitude?: number,
-  isVerified?: boolean,
-  type?: 'observation' | 'alert',
-  alertLevel?: 'low' | 'medium' | 'high' | 'critical'
-}) {
+export async function createObservation(rawData: any) {
   const session = await auth();
   if (!session?.user?.id) throw new Error('Unauthorized');
 
   try {
+    // Anti-Spam: Limite à 5 observations par heure
+    const oneHourAgo = new Date(Date.now() - 1000 * 60 * 60);
+    const recentObsCount = await db.select({ count: sql`count(*)` }).from(observations).where(
+        and(eq(observations.userId, session.user.id), sql`${observations.createdAt} > ${oneHourAgo}`)
+    );
+    // @ts-ignore
+    if (recentObsCount[0].count >= 5) {
+        return { success: false, error: new Error('Limite de signalements atteinte (5/heure). Veuillez patienter.') };
+    }
+
+    const data = observationSchema.parse(rawData);
+    
     const [newObs] = await db.insert(observations).values({
       ...data,
       userId: session.user.id,
@@ -483,7 +549,10 @@ export async function voteObservation(data: { observationId: string, vote: 'conf
 
     try {
         await db.insert(observationVotes).values({
-            ...data,
+            observationId: data.observationId,
+            vote: data.vote,
+            comment: data.comment?.substring(0, 200),
+            suggestedSpeciesId: data.suggestedSpeciesId,
             userId: session.user.id
         }).onConflictDoUpdate({
             target: [observationVotes.userId, observationVotes.observationId],
@@ -491,12 +560,12 @@ export async function voteObservation(data: { observationId: string, vote: 'conf
         });
 
         // Threshold check
-        const votes = await db.query.observationVotes.findMany({
+        const votesCount = await db.query.observationVotes.findMany({
             where: eq(observationVotes.observationId, data.observationId)
         });
 
-        const confirms = votes.filter(v => v.vote === 'confirm').length;
-        const consensus = votes.length > 0 ? (confirms / votes.length) * 100 : 0;
+        const confirms = votesCount.filter(v => v.vote === 'confirm').length;
+        const consensus = votesCount.length > 0 ? (confirms / votesCount.length) * 100 : 0;
 
         if (confirms >= 3 && consensus >= 70) {
             await db.update(observations).set({ isVerified: true }).where(eq(observations.id, data.observationId));
@@ -525,7 +594,17 @@ export async function getAllSpecies() {
 export async function createSpecies(data: any) {
   await ensureAdmin();
   try {
-    await db.insert(species).values(data);
+    await db.insert(species).values({
+        name: data.name,
+        scientificName: data.scientificName,
+        category: data.category,
+        conservationStatus: data.conservationStatus,
+        description: data.description,
+        imageUrl: data.imageUrl,
+        habitat: data.habitat,
+        diet: data.diet,
+        populationEstimate: data.populationEstimate
+    });
     revalidatePath('/admin');
     revalidatePath('/observatoire');
     return { success: true };
@@ -538,7 +617,17 @@ export async function createSpecies(data: any) {
 export async function updateSpecies(id: string, data: any) {
   await ensureAdmin();
   try {
-    await db.update(species).set(data).where(eq(species.id, id));
+    await db.update(species).set({
+        name: data.name,
+        scientificName: data.scientificName,
+        category: data.category,
+        conservationStatus: data.conservationStatus,
+        description: data.description,
+        imageUrl: data.imageUrl,
+        habitat: data.habitat,
+        diet: data.diet,
+        populationEstimate: data.populationEstimate
+    }).where(eq(species.id, id));
     revalidatePath('/admin');
     revalidatePath('/observatoire');
     return { success: true };
@@ -693,11 +782,12 @@ export async function getForumThreads(category?: string, search?: string) {
     }
 }
 
-export async function createForumThread(data: { title: string, content: string, category: string }) {
+export async function createForumThread(rawData: any) {
     const session = await auth();
     if (!session?.user?.id) throw new Error('Unauthorized');
 
     try {
+        const data = forumThreadSchema.parse(rawData);
         await db.insert(forumThreads).values({
             ...data,
             authorId: session.user.id
@@ -741,7 +831,7 @@ export async function createForumReply(threadId: string, content: string) {
     try {
         await db.insert(forumReplies).values({
             threadId,
-            content,
+            content: content.substring(0, 2000),
             authorId: session.user.id
         });
         
@@ -780,11 +870,12 @@ export async function voteForum(type: 'thread' | 'reply', id: string) {
 }
 
 // --- Booking ---
-export async function createBooking(data: any) {
+export async function createBooking(rawData: any) {
     const session = await auth();
     if (!session?.user?.id) throw new Error('Unauthorized');
 
     try {
+        const data = bookingSchema.parse(rawData);
         await db.insert(bookings).values({
             ...data,
             userId: session.user.id
@@ -823,7 +914,7 @@ export async function addSpeciesComment(speciesId: string, content: string) {
     await db.insert(comments).values({
       speciesId,
       userId: session.user.id,
-      content,
+      content: content.substring(0, 1000),
     });
     revalidatePath(`/observatoire/${speciesId}`);
     return { success: true };
@@ -892,10 +983,11 @@ export async function getComments(articleId?: string, speciesId?: string) {
     }
 }
 
-export async function addComment(data: { articleId?: string, speciesId?: string, content: string }) {
+export async function addComment(rawData: any) {
     const session = await auth();
     if (!session?.user?.id) throw new Error('Unauthorized');
     try {
+        const data = commentSchema.parse(rawData);
         await db.insert(comments).values({ 
             ...data, 
             userId: session.user.id 
@@ -995,7 +1087,9 @@ export async function saveQuizResult(data: { quizId: string, score: number, tota
     if (!session?.user?.id) throw new Error('Unauthorized');
     try {
         await db.insert(quizResults).values({ 
-            ...data, 
+            quizId: data.quizId,
+            score: data.score,
+            totalQuestions: data.totalQuestions,
             userId: session.user.id 
         });
         return { success: true };
@@ -1051,10 +1145,11 @@ export async function getProfileData() {
     }
 }
 
-export async function updateProfile(data: { name?: string, image?: string, region?: string }) {
+export async function updateProfile(rawData: any) {
     const session = await auth();
     if (!session?.user?.id) throw new Error('Unauthorized');
     try {
+        const data = profileSchema.parse(rawData);
         await db.update(users).set(data).where(eq(users.id, session.user.id));
         revalidatePath('/profil');
         return { success: true };
