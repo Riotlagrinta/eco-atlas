@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { Map as MapIcon, Loader2, MapPin, Info } from 'lucide-react';
-import { createClient } from '@/lib/supabase/client';
+import { getMapObservations } from '@/lib/actions';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 
@@ -18,36 +18,41 @@ const Map = dynamic(() => import('@/components/Map'), {
 
 export default function CartePage() {
   const [activeFilter, setActiveFilter] = useState<'all' | 'parks' | 'species'>('all');
-  const [recentObs, setRecentObs] = useState<{ id: string, image_url?: string, description: string, species_name?: string, species?: { name: string } }[]>([]);
-  const [nearby, setNearby] = useState<{ observations?: { id: string, name: string, dist: number, image: string }[] } | null>(null);
+  const [recentObs, setRecentObs] = useState<any[]>([]);
+  const [nearby, setNearby] = useState<{ observations?: any[] } | null>(null);
   const [isScanning, setIsScanning] = useState(false);
-  const supabase = createClient();
 
   const scanNearby = () => {
     setIsScanning(true);
     navigator.geolocation.getCurrentPosition(async (pos) => {
-      const { data } = await supabase.rpc('get_nearby_data', {
-        user_lat: pos.coords.latitude,
-        user_lng: pos.coords.longitude,
-        radius_meters: 50000 // 50km
-      });
-      setNearby(data);
+      // Basic client-side filtering for "nearby" to replace RPC for now
+      const allObs = await getMapObservations();
+      const filtered = allObs.filter((o: any) => {
+        if (!o.latitude || !o.longitude) return false;
+        const dist = Math.sqrt(
+          Math.pow(o.latitude - pos.coords.latitude, 2) + 
+          Math.pow(o.longitude - pos.coords.longitude, 2)
+        );
+        return dist < 0.5; // roughly 50km
+      }).map(o => ({
+          id: o.id,
+          name: o.species?.name || 'Espèce',
+          image: o.imageUrl,
+          dist: 0 // Placeholder
+      }));
+      
+      setNearby({ observations: filtered });
       setIsScanning(false);
     });
   };
 
   useEffect(() => {
     async function fetchRecent() {
-      const { data } = await supabase
-        .from('observations')
-        .select('*, species:species_id(name)')
-        .eq('is_verified', true)
-        .order('created_at', { ascending: false })
-        .limit(5);
-      if (data) setRecentObs(data);
+      const data = await getMapObservations();
+      setRecentObs(data.slice(0, 5));
     }
     fetchRecent();
-  }, [supabase]);
+  }, []);
 
   return (
     <div className="h-[calc(100vh-64px)] flex flex-col md:flex-row overflow-hidden">
@@ -111,13 +116,15 @@ export default function CartePage() {
               <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="p-4 bg-green-600 rounded-3xl text-white shadow-xl mb-6">
                 <h4 className="text-xs font-bold uppercase mb-4 flex items-center"><MapPin className="h-3 w-3 mr-1" /> À proximité (50km)</h4>
                 <div className="space-y-3">
-                  {nearby.observations?.map((o: { id: string, name: string, dist: number, image: string }) => (
+                  {nearby.observations?.map((o: any) => (
                     <div key={o.id} className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg bg-white/20 overflow-hidden relative"><Image src={o.image} className="object-cover" alt={o.name} fill /></div>
-                      <span className="text-[10px] font-bold">{o.name} ({(o.dist / 1000).toFixed(1)}km)</span>
+                      <div className="w-8 h-8 rounded-lg bg-white/20 overflow-hidden relative">
+                          {o.image && <Image src={o.image} className="object-cover" alt={o.name} fill />}
+                      </div>
+                      <span className="text-[10px] font-bold">{o.name}</span>
                     </div>
                   ))}
-                  {!nearby.observations && <p className="text-[9px] opacity-70 italic">Aucune espèce proche détectée.</p>}
+                  {(!nearby.observations || nearby.observations.length === 0) && <p className="text-[9px] opacity-70 italic">Aucune espèce proche détectée.</p>}
                 </div>
               </motion.div>
             )}
@@ -126,7 +133,7 @@ export default function CartePage() {
               <div key={obs.id} className="flex items-center space-x-4 p-3 hover:bg-stone-50 rounded-2xl cursor-pointer transition-all border border-transparent hover:border-stone-100 group">
                 <div className="w-14 h-14 bg-stone-100 rounded-xl overflow-hidden flex-shrink-0 shadow-sm relative">
                   <Image
-                    src={obs.image_url || 'https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=100&q=80'}
+                    src={obs.imageUrl || 'https://images.unsplash.com/photo-1502082553048-f009c37129b9?auto=format&fit=crop&w=100&q=80'}
                     alt="Observation"
                     className="object-cover group-hover:scale-110 transition-transform"
                     fill

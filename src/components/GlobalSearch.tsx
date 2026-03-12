@@ -4,33 +4,22 @@ import React, { useState, useEffect } from 'react';
 import { Search, X, Leaf, Map, Newspaper, ArrowRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { getGlobalSearchData } from '@/lib/actions';
 import Fuse from 'fuse.js';
 
 export function GlobalSearch() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const [allData, setAllData] = useState<Array<{ id: string; name?: string; title?: string; category: string; url: string; type?: string }>>([]);
+  const [allData, setAllData] = useState<Array<{ id: string; name?: string; title?: string; category: string; url: string; scientificName?: string }>>([]);
   const router = useRouter();
-  const supabase = createClient();
 
   useEffect(() => {
     async function preloadData() {
-      const [s, p, a] = await Promise.all([
-        supabase.from('species').select('id, name, type:scientific_name').limit(20),
-        supabase.from('protected_areas').select('id, name').limit(10),
-        supabase.from('articles').select('id, title').limit(10)
-      ]);
-
-      const combined = [
-        ...(s.data || []).map(i => ({ ...i, category: 'Espèce', url: '/observatoire' })),
-        ...(p.data || []).map(i => ({ ...i, category: 'Aire Protégée', url: '/carte' })),
-        ...(a.data || []).map(i => ({ ...i, title: i.title, category: 'Actualité', url: '/actualites' }))
-      ];
-      setAllData(combined);
+      const data = await getGlobalSearchData();
+      setAllData(data as any);
     }
     preloadData();
-  }, [supabase]);
+  }, []);
 
   const results = React.useMemo(() => {
     if (!query) return [];

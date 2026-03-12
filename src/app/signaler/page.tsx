@@ -2,35 +2,55 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { useSession } from 'next-auth/react';
 import { Camera, MapPin, Loader2, CheckCircle, AlertCircle, Send } from 'lucide-react';
 import { motion } from 'framer-motion';
 import toast, { Toaster } from 'react-hot-toast';
 import { db } from '@/lib/offline-db';
 import Image from 'next/image';
 import { z } from 'zod';
-import { addXP, incrementChallengeProgress, XP_REWARDS } from '@/lib/gamification';
+import { getAllSpecies, createObservation } from '@/lib/actions';
 import { LevelUpModal } from '@/components/LevelUpModal';
 
 const observationSchema = z.object({
-  user_id: z.string().uuid("L'ID utilisateur est invalide").optional(),
   species_id: z.string().uuid("L'ID de l'espèce est invalide").nullable(),
   description: z.string().min(10, "La description doit contenir au moins 10 caractères").max(1000, "La description est trop longue"),
   image_url: z.string().url("Une photo valide est requise"),
   location: z.string().startsWith("POINT(", "Format de localisation invalide"),
+  latitude: z.number(),
+  longitude: z.number(),
   is_verified: z.boolean(),
   type: z.enum(['observation', 'alert']),
   alert_level: z.enum(['low', 'medium', 'high', 'critical'])
 });
 
 export default function SignalerPage() {
+  const { data: session, status: authStatus } = useSession();
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [newLevel, setNewLevel] = useState(1);
-  // ... rest
+  const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
+  const [coords, setCoords] = useState<{ lat: number, lng: number } | null>(null);
+  const [species, setSpecies] = useState<{ id: string, name: string }[]>([]);
+
+  const [formData, setFormData] = useState({
+    species_id: '',
+    description: '',
+    image_url: '',
+    type: 'observation',
+    alert_level: 'low'
+  });
+
+  const router = useRouter();
+
+  useEffect(() => {
+    if (authStatus === 'unauthenticated') {
+      router.push('/connexion');
+    }
+  }, [authStatus, router]);
 
   useEffect(() => {
     setTimeout(() => {
@@ -45,31 +65,14 @@ export default function SignalerPage() {
       toast.error("Mode hors-ligne activé.");
     });
   }, []);
-  const [status, setStatus] = useState<{ type: 'success' | 'error', msg: string } | null>(null);
-  const [coords, setCoords] = useState<{ lat: number, lng: number } | null>(null);
-  const [species, setSpecies] = useState<{ id: string, name: string }[]>([]);
-
-  const [formData, setFormData] = useState({
-    species_id: '',
-    description: '',
-    image_url: '',
-    type: 'observation',
-    alert_level: 'low'
-  });
-
-  const router = useRouter();
-  const supabase = createClient();
 
   useEffect(() => {
     async function init() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) router.push('/connexion');
-
-      const { data } = await supabase.from('species').select('id, name').order('name');
+      const data = await getAllSpecies();
       if (data) setSpecies(data);
     }
     init();
-  }, [router, supabase]);
+  }, []);
 
   const getGeolocation = () => {
     if (!navigator.geolocation) {
@@ -95,6 +98,10 @@ export default function SignalerPage() {
     if (!file) return;
 
     setUploading(true);
+    
+    const { createClient } = await import('@/lib/supabase/client');
+    const supabase = createClient();
+
     const fileName = `${Math.random()}.${file.name.split('.').pop()}`;
     const filePath = `user_reports/${fileName}`;
 
@@ -105,7 +112,6 @@ export default function SignalerPage() {
     if (!uploadError) {
       const { data: { publicUrl } } = supabase.storage.from('observations').getPublicUrl(filePath);
 
-      // Auto-complétion avec Groq Vision
       setIsAnalyzing(true);
       try {
         const response = await fetch('/api/analyze-image', {
@@ -118,7 +124,6 @@ export default function SignalerPage() {
         if (result.success && result.data) {
           const ai = result.data;
 
-          // Recherche si l'espèce décrite par l'IA existe déjà dans notre BDD
           const matchedSpecies = species.find(s =>
             s.name.toLowerCase().includes(ai.name.toLowerCase()) ||
             (ai.scientific_name && s.name.toLowerCase().includes(ai.scientific_name.toLowerCase()))
@@ -140,6 +145,7 @@ export default function SignalerPage() {
         setFormData({ ...formData, image_url: publicUrl });
       } finally {
         setIsAnalyzing(false);
+        setUploading(false);
       }
     } else {
       setUploading(false);
@@ -155,20 +161,19 @@ export default function SignalerPage() {
     }
 
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
 
     const reportData = {
-      user_id: user?.id,
       species_id: formData.type === 'observation' ? (formData.species_id || null) : null,
       description: formData.description,
       image_url: formData.image_url,
       location: `POINT(${coords.lng} ${coords.lat})`,
+      latitude: coords.lat,
+      longitude: coords.lng,
       is_verified: formData.type === 'alert' ? true : false,
-      type: formData.type,
-      alert_level: formData.alert_level
+      type: formData.type as 'observation' | 'alert',
+      alert_level: formData.alert_level as 'low' | 'medium' | 'high' | 'critical'
     };
 
-    // 🛡️ Validation stricte des données via Zod avec safeParse
     const parsedData = observationSchema.safeParse(reportData);
 
     if (!parsedData.success) {
@@ -185,7 +190,7 @@ export default function SignalerPage() {
           image_url: reportData.image_url,
           location: reportData.location,
           type: formData.type as 'observation' | 'alert',
-          alert_level: formData.alert_level,
+          alert_level: formData.alert_level as any,
           created_at: new Date().toISOString()
         });
         toast.success("Hors-ligne : Signalement enregistré localement sur votre téléphone !");
@@ -194,27 +199,26 @@ export default function SignalerPage() {
         return;
       }
 
-      const { error } = await supabase.from('observations').insert([reportData]);
+      const result = await createObservation({
+          speciesId: reportData.species_id,
+          description: reportData.description,
+          imageUrl: reportData.image_url,
+          location: reportData.location,
+          latitude: reportData.latitude,
+          longitude: reportData.longitude,
+          isVerified: reportData.is_verified,
+          type: reportData.type,
+          alertLevel: reportData.alert_level
+      });
 
-      if (error) {
-        toast.error("Erreur : " + error.message);
+      if (!result.success) {
+        toast.error("Erreur : " + (result.error as any)?.message);
       } else {
-        // 🎮 Récompense XP
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        if (currentUser) {
-          const xpAmount = formData.type === 'alert' ? XP_REWARDS.ALERT_SENT : XP_REWARDS.OBSERVATION_VALIDATED;
-          const result = await addXP(currentUser.id, xpAmount, formData.type === 'alert' ? 'Alerte envoyée' : 'Observation envoyée');
-          toast.success(`+${xpAmount} XP ✨`, { icon: '🎮' });
-
-          // Vérifier le level-up
-          if (result.leveledUp) {
-            setNewLevel(result.newLevel);
+        if (result.xpResult?.leveledUp) {
+            setNewLevel(result.xpResult.newLevel);
             setShowLevelUp(true);
-          }
-
-          // Progrémenter les défis
-          await incrementChallengeProgress(currentUser.id, formData.type === 'alert' ? 'alerts' : 'observations');
         }
+        toast.success(`+${formData.type === 'alert' ? 50 : 25} XP ✨`, { icon: '🎮' });
         toast.success(formData.type === 'alert' ? "ALERTE ENVOYÉE !" : "Observation envoyée avec succès !");
         setTimeout(() => router.push('/carte'), 2000);
       }

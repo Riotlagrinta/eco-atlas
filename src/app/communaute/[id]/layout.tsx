@@ -1,5 +1,7 @@
 import { Metadata } from 'next';
-import { createClient } from '@/lib/supabase/server';
+import { db } from '@/lib/db';
+import { forumThreads } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -10,13 +12,10 @@ export async function generateMetadata(
   { params }: Props
 ): Promise<Metadata> {
   const { id } = await params;
-  const supabase = await createClient();
   
-  const { data: thread } = await supabase
-    .from('forum_threads')
-    .select('title, content, category')
-    .eq('id', id)
-    .single();
+  const thread = await db.query.forumThreads.findFirst({
+    where: eq(forumThreads.id, id)
+  });
 
   if (!thread) {
     return {
@@ -39,7 +38,7 @@ export async function generateMetadata(
       title: thread.title,
       description: thread.content.substring(0, 160),
       type: 'article',
-      section: categoryLabels[thread.category] || 'Communauté',
+      section: (thread.category && categoryLabels[thread.category]) || 'Communauté',
     },
     twitter: {
       card: 'summary_large_image',

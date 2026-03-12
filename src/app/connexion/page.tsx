@@ -2,35 +2,21 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
-import { Leaf, Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
+import { signIn } from 'next-auth/react';
+import { Leaf, Mail, Lock, Loader2, AlertCircle, Github } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 export default function ConnexionPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
-  const supabase = createClient();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGitHubLogin = async () => {
     setLoading(true);
-    setError(null);
-
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) {
-      setError(error.message);
+    try {
+      await signIn('github', { callbackUrl: '/' });
+    } catch (err) {
+      setError("Une erreur est survenue lors de la connexion.");
       setLoading(false);
-    } else {
-      router.push('/');
-      router.refresh();
     }
   };
 
@@ -47,7 +33,7 @@ export default function ConnexionPage() {
               <Leaf className="h-8 w-8 text-green-600" />
             </div>
             <h1 className="text-2xl font-bold text-stone-900">Bon retour sur Eco-Atlas</h1>
-            <p className="text-stone-500 mt-2 text-sm">Connectez-vous pour accéder à vos observations</p>
+            <p className="text-stone-500 mt-2 text-sm">Connectez-vous pour protéger la biodiversité</p>
           </div>
 
           {error && (
@@ -57,48 +43,49 @@ export default function ConnexionPage() {
             </div>
           )}
 
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div>
-              <label className="block text-sm font-semibold text-stone-700 mb-1.5 ml-1">Email</label>
+          <div className="space-y-4">
+            <button
+              onClick={handleGitHubLogin}
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-3 bg-stone-900 hover:bg-stone-800 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all disabled:opacity-50"
+            >
+              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Github className="h-5 w-5" />}
+              Continuer avec GitHub
+            </button>
+
+            <div className="relative my-8">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-stone-200"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-4 bg-white text-stone-500">Ou (Bientôt disponible)</span>
+              </div>
+            </div>
+
+            <div className="space-y-4 opacity-50 pointer-events-none">
               <div className="relative">
                 <input
+                  disabled
                   type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all outline-none text-sm"
+                  className="w-full pl-11 pr-4 py-3 bg-stone-50 border border-stone-200 rounded-xl outline-none text-sm"
                   placeholder="nom@exemple.com"
                 />
                 <Mail className="absolute left-4 top-3.5 h-4 w-4 text-stone-400" />
               </div>
-            </div>
-
-            <div>
-              <div className="flex justify-between items-center mb-1.5 ml-1">
-                <label className="text-sm font-semibold text-stone-700">Mot de passe</label>
-                <Link href="#" className="text-xs font-bold text-green-600 hover:text-green-700">Oublié ?</Link>
-              </div>
               <div className="relative">
                 <input
+                  disabled
                   type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all outline-none text-sm"
+                  className="w-full pl-11 pr-4 py-3 bg-stone-50 border border-stone-200 rounded-xl outline-none text-sm"
                   placeholder="••••••••"
                 />
                 <Lock className="absolute left-4 top-3.5 h-4 w-4 text-stone-400" />
               </div>
+              <button disabled className="w-full bg-stone-200 text-stone-500 font-bold py-3.5 rounded-xl cursor-not-allowed">
+                Se connecter par email
+              </button>
             </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-green-600/20 transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Se connecter'}
-            </button>
-          </form>
+          </div>
 
           <div className="mt-8 text-center text-sm text-stone-500">
             Pas encore de compte ?{' '}

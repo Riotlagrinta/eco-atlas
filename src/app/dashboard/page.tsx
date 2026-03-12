@@ -1,17 +1,16 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { 
+  TrendingUp, Users, Eye, Database, Download, 
+  Map as MapIcon, Loader2, ShieldCheck, Activity
+} from 'lucide-react';
+import { motion } from 'framer-motion';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   LineChart, Line, PieChart, Pie, Cell, AreaChart, Area 
 } from 'recharts';
-import { 
-  TrendingUp, Users, Eye, Database, Download, Filter, 
-  Map as MapIcon, Calendar, ArrowUpRight, ArrowDownRight,
-  Loader2, ShieldCheck, Activity
-} from 'lucide-react';
-import { motion } from 'framer-motion';
+import { getDashboardStats } from '@/lib/actions';
 
 const COLORS = ['#16a34a', '#22c55e', '#4ade80', '#86efac', '#bbf7d0'];
 
@@ -19,58 +18,18 @@ export default function InstitutionalDashboard() {
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<any>(null);
   const [timeRange, setTimeRange] = useState('30d');
-  const supabase = createClient();
 
   useEffect(() => {
     async function fetchStats() {
       setLoading(true);
-      
-      // Simuler des données analytiques (en production, ces données viendraient de vues Supabase ou d'agrégations)
-      const { data: obsData } = await supabase
-        .from('observations')
-        .select('created_at, is_verified, species_id');
-      
-      const { data: userData } = await supabase
-        .from('profiles')
-        .select('region, created_at');
-
-      // Agrégation basique pour les graphiques
-      const obsByDate: any = {};
-      obsData?.forEach((o: any) => {
-        const date = new Date(o.created_at).toLocaleDateString('fr-FR', { month: 'short', day: 'numeric' });
-        obsByDate[date] = (obsByDate[date] || 0) + 1;
-      });
-
-      const chartData = Object.keys(obsByDate).map(key => ({
-        name: key,
-        value: obsByDate[key]
-      })).slice(-10);
-
-      const regionMap: any = {};
-      userData?.forEach((u: any) => {
-        if (u.region) regionMap[u.region] = (regionMap[u.region] || 0) + 1;
-      });
-
-      const pieData = Object.keys(regionMap).map(key => ({
-        name: key,
-        value: regionMap[key]
-      }));
-
-      setStats({
-        totalObservations: obsData?.length || 0,
-        verifiedRate: Math.round(((obsData?.filter((o: any) => o.is_verified).length || 0) / (obsData?.length || 1)) * 100),
-        totalUsers: userData?.length || 0,
-        activePartners: 12, // Placeholder
-        chartData,
-        pieData
-      });
-      
+      const data = await getDashboardStats();
+      setStats(data);
       setLoading(false);
     }
     fetchStats();
-  }, [supabase, timeRange]);
+  }, [timeRange]);
 
-  if (loading) return (
+  if (loading || !stats) return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-stone-50">
       <Loader2 className="h-12 w-12 text-green-600 animate-spin mb-4" />
       <p className="text-stone-500 font-bold animate-pulse">Chargement de l'Atlas Analytique...</p>
@@ -203,7 +162,7 @@ export default function InstitutionalDashboard() {
                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[i % COLORS.length] }} />
                     <span className="text-xs font-bold text-stone-600">{item.name}</span>
                   </div>
-                  <span className="text-xs font-black text-stone-900">{Math.round((item.value / stats.totalUsers) * 100)}%</span>
+                  <span className="text-xs font-black text-stone-900">{stats.totalUsers > 0 ? Math.round((item.value / stats.totalUsers) * 100) : 0}%</span>
                 </div>
               ))}
             </div>

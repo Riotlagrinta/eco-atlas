@@ -1,12 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
-
-function getSupabaseAdmin() {
-    return createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-}
+import { db } from '@/lib/db';
+import { pushSubscriptions, notificationPreferences } from '@/lib/db/schema';
+import { eq, and } from 'drizzle-orm';
 
 export async function POST(req: NextRequest) {
     try {
@@ -18,17 +13,41 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Champs requis manquants.' }, { status: 400 });
         }
 
-        const admin = getSupabaseAdmin();
+        // Upsert push_subscription
+        const existingSub = await db.query.pushSubscriptions.findFirst({
+            where: and(
+                eq(pushSubscriptions.userId, userId),
+                eq(pushSubscriptions.endpoint, endpoint)
+            )
+        });
 
-        await admin.from('push_subscriptions').upsert(
-            { user_id: userId, endpoint, p256dh, auth },
-            { onConflict: 'user_id,endpoint' }
-        );
+        if (existingSub) {
+            await db.update(pushSubscriptions)
+                .set({ p256dh, auth })
+                .where(eq(pushSubscriptions.id, existingSub.id));
+        } else {
+            await db.insert(pushSubscriptions).values({
+                userId, endpoint, p256dh, auth
+            });
+        }
 
-        await admin.from('notification_preferences').upsert(
-            { user_id: userId, push_enabled: true, alert_radius_km: 50, alert_types: ['critical', 'high'] },
-            { onConflict: 'user_id' }
-        );
+        // Upsert notification_preferences
+        const existingPref = await db.query.notificationPreferences.findFirst({
+            where: eq(notificationPreferences.userId, userId)
+        });
+
+        if (existingPref) {
+            await db.update(notificationPreferences)
+                .set({ pushEnabled: true })
+                .where(eq(notificationPreferences.userId, userId));
+        } else {
+            await db.insert(notificationPreferences).values({
+                userId,
+                pushEnabled: true,
+                alertRadiusKm: 50,
+                alertTypes: ['critical', 'high']
+            });
+        }
 
         return NextResponse.json({ success: true });
     } catch (error) {

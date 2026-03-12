@@ -1,52 +1,36 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { getAllTrails } from '@/lib/actions';
 import { 
   Mountain, Map, Clock, Zap, ArrowRight, 
-  Search, Filter, Loader2, Star, TreePine 
+  Search, Loader2, Star, TreePine 
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
 
-interface Trail {
-  id: string;
-  name: string;
-  description: string;
-  difficulty: 'easy' | 'moderate' | 'hard';
-  duration_hours: number;
-  distance_km: number;
-  image_url: string;
-  is_featured: boolean;
-}
-
-const difficultyLabels = {
+const difficultyLabels: Record<string, { label: string, color: string }> = {
   easy: { label: 'Facile', color: 'text-green-600 bg-green-50' },
   moderate: { label: 'Modéré', color: 'text-amber-600 bg-amber-50' },
   hard: { label: 'Difficile', color: 'text-red-600 bg-red-50' },
 };
 
 export default function EcotourismePage() {
-  const [trails, setTrails] = useState<Trail[]>([]);
+  const [trails, setTrails] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeDifficulty, setActiveDifficulty] = useState<string>('all');
-  const supabase = createClient();
 
   useEffect(() => {
     async function fetchTrails() {
       setLoading(true);
-      const { data } = await supabase
-        .from('eco_trails')
-        .select('*')
-        .order('is_featured', { ascending: false });
-      
-      if (data) setTrails(data);
+      const data = await getAllTrails();
+      setTrails(data);
       setLoading(false);
     }
     fetchTrails();
-  }, [supabase]);
+  }, []);
 
   const filteredTrails = trails.filter(t => 
     (activeDifficulty === 'all' || t.difficulty === activeDifficulty) &&
@@ -102,7 +86,7 @@ export default function EcotourismePage() {
                 onClick={() => setActiveDifficulty(diff)}
                 className={`px-6 py-2 rounded-xl text-xs font-bold transition-all ${activeDifficulty === diff ? 'bg-white text-green-600 shadow-sm' : 'text-stone-400 hover:text-stone-600'}`}
               >
-                {diff === 'all' ? 'Tous' : difficultyLabels[diff as keyof typeof difficultyLabels].label}
+                {diff === 'all' ? 'Tous' : (difficultyLabels[diff]?.label || diff)}
               </button>
             ))}
           </div>
@@ -131,19 +115,19 @@ export default function EcotourismePage() {
                 className="group relative bg-white rounded-[40px] border border-stone-100 overflow-hidden shadow-sm hover:shadow-2xl transition-all"
               >
                 <div className="relative h-72">
-                  <Image 
-                    src={trail.image_url || "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1000&q=80"} 
+                  {trail.imageUrl && <Image 
+                    src={trail.imageUrl || "https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=1000&q=80"} 
                     alt={trail.name}
                     className="object-cover group-hover:scale-110 transition-transform duration-700"
                     fill
-                  />
+                  />}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
                   <div className="absolute top-6 right-6">
-                    <span className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg ${difficultyLabels[trail.difficulty].color}`}>
-                      {difficultyLabels[trail.difficulty].label}
+                    <span className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest shadow-lg ${difficultyLabels[trail.difficulty]?.color || 'bg-stone-100'}`}>
+                      {difficultyLabels[trail.difficulty]?.label || trail.difficulty}
                     </span>
                   </div>
-                  {trail.is_featured && (
+                  {trail.isFeatured && (
                     <div className="absolute top-6 left-6 bg-amber-400 text-stone-900 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase flex items-center gap-1 shadow-lg">
                       <Star className="h-3 w-3 fill-current" /> Coup de Coeur
                     </div>
@@ -157,11 +141,11 @@ export default function EcotourismePage() {
                   <div className="flex items-center gap-6 mb-6">
                     <div className="flex items-center gap-2">
                       <Clock className="h-4 w-4 text-green-600" />
-                      <span className="text-xs font-bold text-stone-600">{trail.duration_hours}h</span>
+                      <span className="text-xs font-bold text-stone-600">{trail.durationHours}h</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Map className="h-4 w-4 text-blue-600" />
-                      <span className="text-xs font-bold text-stone-600">{trail.distance_km}km</span>
+                      <span className="text-xs font-bold text-stone-600">{trail.distanceKm}km</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Zap className="h-4 w-4 text-amber-500" />

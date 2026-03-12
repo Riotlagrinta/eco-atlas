@@ -1,72 +1,66 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { Newspaper, Calendar, User, ArrowRight, Loader2, MessageSquare, Send, X, Share2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
+import { getAllArticles, getComments, addComment } from '@/lib/actions';
+import { useSession } from 'next-auth/react';
 
 interface Article {
   id: string;
   title: string;
   content: string;
-  image_url: string;
-  category: string;
-  created_at: string;
+  image_url: string | null;
+  category: string | null;
+  created_at: Date | null;
 }
 
 interface ArticleComment {
   id: string;
   content: string;
-  created_at: string;
-  profiles: {
-    full_name: string;
-    avatar_url: string | null;
+  createdAt: Date | null;
+  user: {
+    name: string | null;
+    image: string | null;
   } | null;
 }
 
 export default function ActualitesPage() {
+  const { data: session } = useSession();
   const [articles, setArticles] = useState<Article[]>([]);
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
-  const [comments, setComments] = useState<ArticleComment[]>([]);
+  const [comments, setComments] = useState<any[]>([]);
   const [newComment, setNewComment] = useState('');
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
 
   useEffect(() => {
     async function fetchArticles() {
-      const { data } = await supabase.from('articles').select('*').order('created_at', { ascending: false });
-      if (data) setArticles(data);
+      const data = await getAllArticles();
+      setArticles(data as Article[]);
       setLoading(false);
     }
     fetchArticles();
-  }, [supabase]);
+  }, []);
 
   const fetchComments = async (articleId: string) => {
-    const { data } = await supabase
-      .from('comments')
-      .select('*, profiles(full_name, avatar_url)')
-      .eq('article_id', articleId)
-      .order('created_at', { ascending: true });
-    if (data) setComments(data);
+    const data = await getComments(articleId);
+    setComments(data);
   };
 
   const handleSendComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim()) return;
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return alert("Connectez-vous pour commenter !");
+    if (!session?.user) return alert("Connectez-vous pour commenter !");
 
-    const { error } = await supabase.from('comments').insert([{
-      user_id: user.id,
-      article_id: selectedArticle?.id,
-      content: newComment
-    }]);
+    const res = await addComment(selectedArticle!.id, newComment);
 
-    if (!error) {
+    if (res.success) {
       setNewComment('');
       fetchComments(selectedArticle!.id);
+    } else {
+        alert("Erreur lors de l'ajout du commentaire");
     }
   };
 
@@ -85,7 +79,7 @@ export default function ActualitesPage() {
               className="bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl relative border border-stone-200"
             >
               <div className="relative h-64 md:h-80">
-                <Image src={selectedArticle.image_url} className="object-cover" alt="Article" fill />
+                <Image src={selectedArticle.image_url || ''} className="object-cover" alt="Article" fill />
                 <button onClick={() => setSelectedArticle(null)} className="absolute top-4 right-4 bg-white shadow-lg p-2 rounded-full hover:bg-stone-100 transition-all z-10"><X className="h-6 w-6" /></button>
               </div>
 
@@ -96,7 +90,7 @@ export default function ActualitesPage() {
                     <h2 className="text-3xl font-bold text-stone-900 mt-4">{selectedArticle.title}</h2>
                   </div>
                   <button
-                    onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(selectedArticle.title + " - Lu sur Eco-Atlas Togo : " + window.location.href)}`, '_blank')}
+                    onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(selectedArticle.title + " - Lu sur Eco-Atlas Togo : " + (typeof window !== 'undefined' ? window.location.href : ''))}`, '_blank')}
                     className="flex items-center text-xs font-bold text-green-600 hover:bg-green-50 px-4 py-2 rounded-xl border border-green-100 transition-all"
                   >
                     <Share2 className="h-4 w-4 mr-2" /> WhatsApp
@@ -115,14 +109,14 @@ export default function ActualitesPage() {
                     {comments.map((c) => (
                       <div key={c.id} className="flex space-x-4">
                         <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-stone-200 overflow-hidden flex-shrink-0 relative">
-                          {c.profiles?.avatar_url ? <Image src={c.profiles.avatar_url} className="object-cover" alt="Avatar" fill /> : <User className="h-5 w-5 text-stone-300" />}
+                          {c.user?.image ? <Image src={c.user.image} className="object-cover" alt="Avatar" fill /> : <User className="h-5 w-5 text-stone-300" />}
                         </div>
                         <div className="flex-1">
                           <div className="bg-white p-4 rounded-2xl border border-stone-100 shadow-sm relative">
-                            <p className="font-bold text-xs text-stone-900 mb-1">{c.profiles?.full_name || "Anonyme"}</p>
+                            <p className="font-bold text-xs text-stone-900 mb-1">{c.user?.name || "Anonyme"}</p>
                             <p className="text-sm text-stone-600 leading-relaxed">{c.content}</p>
                           </div>
-                          <span className="text-[10px] text-stone-400 mt-1 ml-2">{new Date(c.created_at).toLocaleDateString('fr-FR')}</span>
+                          <span className="text-[10px] text-stone-400 mt-1 ml-2">{c.createdAt ? new Date(c.createdAt).toLocaleDateString('fr-FR') : ''}</span>
                         </div>
                       </div>
                     ))}
@@ -179,7 +173,7 @@ export default function ActualitesPage() {
 
               <div className="p-8">
                 <div className="flex items-center text-stone-400 text-xs mb-4 space-x-4">
-                  <span className="flex items-center"><Calendar className="h-3 w-3 mr-1" /> {new Date(article.created_at).toLocaleDateString('fr-FR')}</span>
+                  <span className="flex items-center"><Calendar className="h-3 w-3 mr-1" /> {article.created_at ? new Date(article.created_at).toLocaleDateString('fr-FR') : ''}</span>
                 </div>
                 <h3 className="text-xl font-bold text-stone-900 mb-4 group-hover:text-green-600 transition-colors line-clamp-2">
                   {article.title}

@@ -1,76 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import Link from 'next/link';
-
-import { createClient } from '@/lib/supabase/client';
-import { Leaf, Mail, Lock, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Leaf, CheckCircle2, Github, LogIn } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { signIn } from 'next-auth/react';
 
 export default function InscriptionPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-
-  const supabase = createClient();
-
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError(null);
-
-    if (password !== confirmPassword) {
-      setError("Les mots de passe ne correspondent pas.");
-      setLoading(false);
-      return;
-    }
-
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-    } else {
-      setSuccess(true);
-      setLoading(false);
-    }
+  const handleGitHubSignup = () => {
+    signIn('github', { callbackUrl: '/' });
   };
-
-  if (success) {
-    return (
-      <div className="min-h-[calc(100vh-64px)] flex items-center justify-center p-4 bg-stone-50">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="max-w-md w-full bg-white p-10 rounded-3xl shadow-xl text-center border border-stone-100"
-        >
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-6 text-green-600">
-            <CheckCircle2 className="h-10 w-10" />
-          </div>
-          <h1 className="text-2xl font-bold text-stone-900 mb-4">Vérifiez vos e-mails !</h1>
-          <p className="text-stone-600 leading-relaxed mb-8">
-            Nous avons envoyé un lien de confirmation à <span className="font-bold text-stone-900">{email}</span>.
-            Veuillez cliquer sur le lien pour activer votre compte.
-          </p>
-          <Link
-            href="/connexion"
-            className="inline-block bg-stone-900 text-white font-bold px-8 py-3 rounded-xl hover:bg-stone-800 transition-colors"
-          >
-            Aller à la page de connexion
-          </Link>
-        </motion.div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-[calc(100vh-64px)] flex items-center justify-center p-4 bg-stone-50">
@@ -85,75 +24,39 @@ export default function InscriptionPage() {
               <Leaf className="h-8 w-8 text-green-600" />
             </div>
             <h1 className="text-2xl font-bold text-stone-900">Rejoindre Eco-Atlas</h1>
-            <p className="text-stone-500 mt-2 text-sm">Commencez à protéger la biodiversité avec nous</p>
+            <p className="text-stone-500 mt-2 text-sm">Créez votre compte via nos partenaires sécurisés</p>
           </div>
 
-          {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-xl flex items-center text-red-700 text-sm">
-              <AlertCircle className="h-5 w-5 mr-2 shrink-0" />
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSignUp} className="space-y-4">
-            <div>
-              <label className="block text-sm font-semibold text-stone-700 mb-1.5 ml-1">Email</label>
-              <div className="relative">
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all outline-none text-sm"
-                  placeholder="nom@exemple.com"
-                />
-                <Mail className="absolute left-4 top-3.5 h-4 w-4 text-stone-400" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-stone-700 mb-1.5 ml-1">Mot de passe</label>
-              <div className="relative">
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all outline-none text-sm"
-                  placeholder="••••••••"
-                />
-                <Lock className="absolute left-4 top-3.5 h-4 w-4 text-stone-400" />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-stone-700 mb-1.5 ml-1">Confirmer le mot de passe</label>
-              <div className="relative">
-                <input
-                  type="password"
-                  required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 bg-stone-50 border border-stone-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all outline-none text-sm"
-                  placeholder="••••••••"
-                />
-                <Lock className="absolute left-4 top-3.5 h-4 w-4 text-stone-400" />
-              </div>
-            </div>
-
+          <div className="space-y-4">
             <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-stone-900 hover:bg-stone-800 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed mt-4"
+              onClick={handleGitHubSignup}
+              className="w-full flex items-center justify-center gap-3 bg-stone-900 hover:bg-stone-800 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all"
             >
-              {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : 'Créer mon compte'}
+              <Github className="h-5 w-5" />
+              S&apos;inscrire avec GitHub
             </button>
-          </form>
+
+            <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl flex items-start text-blue-700 text-xs leading-relaxed">
+              <CheckCircle2 className="h-4 w-4 mr-2 shrink-0 mt-0.5" />
+              <span>
+                En vous inscrivant, vous rejoignez une communauté de naturalistes engagés pour la biodiversité du Togo. Vos données sont protégées.
+              </span>
+            </div>
+
+            <div className="relative my-8">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-stone-200"></div>
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-4 bg-white text-stone-500 italic">Autres options bientôt...</span>
+              </div>
+            </div>
+          </div>
 
           <div className="mt-8 text-center text-sm text-stone-500">
             Déjà un compte ?{' '}
-            <Link href="/connexion" className="font-bold text-green-600 hover:text-green-700 underline underline-offset-4">
-              Se connecter
+            <Link href="/connexion" className="font-bold text-green-600 hover:text-green-700 underline underline-offset-4 flex items-center justify-center mt-2">
+              <LogIn className="h-4 w-4 mr-1" /> Se connecter
             </Link>
           </div>
         </div>

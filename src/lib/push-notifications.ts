@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/client';
+import { savePushSubscription, getUnreadNotifications, getAllNotifications, markNotificationAsRead, markAllNotificationsAsRead } from '@/lib/actions';
 
 /**
  * Demande la permission de notification au navigateur et retourne le subscription object.
@@ -15,10 +15,8 @@ export async function requestNotificationPermission(): Promise<PushSubscription 
         return null;
     }
 
-    // Attendre que le SW soit prêt (enregistré par next-pwa)
     const registration = await navigator.serviceWorker.ready;
 
-    // S'abonner aux push (VAPID Key publique)
     const subscription = await registration.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(
@@ -30,73 +28,46 @@ export async function requestNotificationPermission(): Promise<PushSubscription 
 }
 
 /**
- * Enregistre le push subscription dans Supabase
+ * Enregistre le push subscription dans la base de données via Server Action
  */
-export async function savePushSubscription(userId: string, subscription: PushSubscription) {
-    const supabase = createClient();
+export async function registerPushSubscription(subscription: PushSubscription) {
     const subJSON = subscription.toJSON();
 
-    await supabase.from('push_subscriptions').upsert({
-        user_id: userId,
+    await savePushSubscription({
         endpoint: subJSON.endpoint,
         p256dh: subJSON.keys?.p256dh || '',
         auth: subJSON.keys?.auth || '',
-    }, { onConflict: 'user_id,endpoint' });
+    });
 }
 
 /**
- * Récupérer les notifications non-lues d'un utilisateur
+ * Récupérer les notifications non-lues
  */
-export async function getUnreadNotifications(userId: string) {
-    const supabase = createClient();
-    const { data } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('is_read', false)
-        .order('created_at', { ascending: false })
-        .limit(20);
-    return data || [];
+export async function fetchUnreadNotifications() {
+    return await getUnreadNotifications();
 }
 
 /**
- * Récupérer toutes les notifications d'un utilisateur
+ * Récupérer toutes les notifications
  */
-export async function getAllNotifications(userId: string) {
-    const supabase = createClient();
-    const { data } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(50);
-    return data || [];
+export async function fetchAllNotifications() {
+    return await getAllNotifications();
 }
 
 /**
  * Marquer une notification comme lue
  */
 export async function markAsRead(notificationId: string) {
-    const supabase = createClient();
-    await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('id', notificationId);
+    await markNotificationAsRead(notificationId);
 }
 
 /**
  * Marquer toutes les notifications comme lues
  */
-export async function markAllAsRead(userId: string) {
-    const supabase = createClient();
-    await supabase
-        .from('notifications')
-        .update({ is_read: true })
-        .eq('user_id', userId)
-        .eq('is_read', false);
+export async function markAllAsRead() {
+    await markAllNotificationsAsRead();
 }
 
-// === Utilitaire VAPID ===
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
     const padding = '='.repeat((4 - base64String.length % 4) % 4);
     const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');

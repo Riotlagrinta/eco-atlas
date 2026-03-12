@@ -1,26 +1,13 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { MessageSquare, Plus, Loader2, ThumbsUp, MessageCircle, Pin, Search, Leaf, AlertTriangle, Map, HelpCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
 import toast, { Toaster } from 'react-hot-toast';
-
-interface Thread {
-    id: string;
-    title: string;
-    content: string;
-    author_id: string;
-    category: string;
-    image_url: string | null;
-    upvotes: number;
-    replies_count: number;
-    is_pinned: boolean;
-    created_at: string;
-    profiles: { full_name: string; avatar_url: string | null }[] | null;
-}
+import { getForumThreads, createForumThread } from '@/lib/actions';
+import { useSession } from 'next-auth/react';
 
 const CATEGORIES = [
     { key: 'all', label: 'Tous', icon: MessageSquare },
@@ -32,7 +19,8 @@ const CATEGORIES = [
 ];
 
 export default function CommunautePage() {
-    const [threads, setThreads] = useState<Thread[]>([]);
+    const { data: session } = useSession();
+    const [threads, setThreads] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [category, setCategory] = useState('all');
     const [search, setSearch] = useState('');
@@ -42,66 +30,52 @@ export default function CommunautePage() {
     const [newCategory, setNewCategory] = useState('general');
     const [submitting, setSubmitting] = useState(false);
 
-    const supabase = createClient();
-
-    const fetchThreads = useCallback(async () => {
+    const fetchThreadsData = useCallback(async () => {
         setLoading(true);
-        let query = supabase
-            .from('forum_threads')
-            .select('*, profiles:author_id(full_name, avatar_url)')
-            .order('is_pinned', { ascending: false })
-            .order('created_at', { ascending: false })
-            .limit(30);
-
-        if (category !== 'all') {
-            query = query.eq('category', category);
+        try {
+            const data = await getForumThreads(category, search);
+            setThreads(data || []);
+        } catch (err) {
+            toast.error("Erreur de chargement");
+        } finally {
+            setLoading(false);
         }
-
-        if (search.trim()) {
-            query = query.ilike('title', `%${search}%`);
-        }
-
-        const { data } = await query;
-        setThreads((data as unknown as Thread[]) || []);
-        setLoading(false);
-    }, [supabase, category, search]);
+    }, [category, search]);
 
     useEffect(() => {
-        fetchThreads();
-    }, [fetchThreads]);
+        fetchThreadsData();
+    }, [fetchThreadsData]);
 
     const handleCreateThread = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newTitle.trim() || !newContent.trim()) return;
 
         setSubmitting(true);
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
+        if (!session) {
             toast.error('Connectez-vous pour publier.');
             setSubmitting(false);
             return;
         }
 
-        const { error } = await supabase.from('forum_threads').insert({
+        const res = await createForumThread({
             title: newTitle.trim(),
             content: newContent.trim(),
             category: newCategory,
-            author_id: user.id,
         });
 
-        if (error) {
-            toast.error('Erreur : ' + error.message);
+        if (!res.success) {
+            toast.error('Erreur lors de la création');
         } else {
             toast.success('Discussion créée !');
             setNewTitle('');
             setNewContent('');
             setShowNewThread(false);
-            fetchThreads();
+            fetchThreadsData();
         }
         setSubmitting(false);
     };
 
-    const timeAgo = (dateStr: string) => {
+    const timeAgo = (dateStr: any) => {
         const diff = Date.now() - new Date(dateStr).getTime();
         const hours = Math.floor(diff / 3600000);
         if (hours < 1) return 'À l\'instant';
@@ -141,7 +115,6 @@ export default function CommunautePage() {
                 <p className="text-stone-500 mt-2">Échangez avec les naturalistes du Togo</p>
             </div>
 
-            {/* Barre de recherche + bouton */}
             <div className="flex gap-3 mb-6">
                 <div className="flex-1 relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-300" />
@@ -161,7 +134,6 @@ export default function CommunautePage() {
                 </button>
             </div>
 
-            {/* Formulaire nouveau sujet */}
             {showNewThread && (
                 <motion.form
                     initial={{ opacity: 0, y: -10 }}
@@ -204,7 +176,6 @@ export default function CommunautePage() {
                 </motion.form>
             )}
 
-            {/* Filtres catégories */}
             <div className="flex flex-wrap gap-2 mb-6">
                 {CATEGORIES.map(c => (
                     <button
@@ -220,7 +191,6 @@ export default function CommunautePage() {
                 ))}
             </div>
 
-            {/* Liste des discussions */}
             {loading ? (
                 <div className="flex justify-center py-20">
                     <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
@@ -242,7 +212,7 @@ export default function CommunautePage() {
                         >
                             <Link
                                 href={`/communaute/${thread.id}`}
-                                className={`block p-5 rounded-2xl border transition-all hover:shadow-md ${thread.is_pinned
+                                className={`block p-5 rounded-2xl border transition-all hover:shadow-md ${thread.isPinned
                                         ? 'bg-blue-50 border-blue-200'
                                         : 'bg-white border-stone-100'
                                     }`}
@@ -250,13 +220,13 @@ export default function CommunautePage() {
                                 <div className="flex items-start gap-4">
                                     <div className="relative w-10 h-10 rounded-full overflow-hidden bg-stone-200 flex-shrink-0">
                                         <Image
-                                            src={thread.profiles?.[0]?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(thread.profiles?.[0]?.full_name || 'U')}&background=3b82f6&color=fff`}
+                                            src={thread.author?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(thread.author?.name || 'U')}&background=3b82f6&color=fff`}
                                             alt="Avatar" fill className="object-cover"
                                         />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                            {thread.is_pinned && (
+                                            {thread.isPinned && (
                                                 <Pin className="h-3 w-3 text-blue-500 flex-shrink-0" />
                                             )}
                                             <h3 className="font-bold text-stone-900 text-sm truncate">{thread.title}</h3>
@@ -265,13 +235,13 @@ export default function CommunautePage() {
                                         <div className="flex items-center gap-3 flex-wrap">
                                             {getCategoryBadge(thread.category)}
                                             <span className="text-[10px] text-stone-300">
-                                                {thread.profiles?.[0]?.full_name || 'Anonyme'} · {timeAgo(thread.created_at)}
+                                                {thread.author?.name || 'Anonyme'} · {timeAgo(thread.createdAt)}
                                             </span>
                                             <span className="flex items-center gap-1 text-[10px] text-stone-400">
                                                 <ThumbsUp className="h-3 w-3" /> {thread.upvotes}
                                             </span>
                                             <span className="flex items-center gap-1 text-[10px] text-stone-400">
-                                                <MessageCircle className="h-3 w-3" /> {thread.replies_count}
+                                                <MessageCircle className="h-3 w-3" /> {thread.repliesCount}
                                             </span>
                                         </div>
                                     </div>

@@ -4,6 +4,7 @@ import "./globals.css";
 import { Navbar } from "@/components/Navbar";
 import { MobileNav } from "@/components/MobileNav";
 import { Footer } from "@/components/Footer";
+import SessionWrapper from "@/components/SessionWrapper";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -57,12 +58,14 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-stone-50 text-gray-900`}
       >
-        <Navbar />
-        <main className="pt-16 pb-24 md:pb-0 min-h-screen">
-          {children}
-        </main>
-        <Footer />
-        <MobileNav />
+        <SessionWrapper>
+          <Navbar />
+          <main className="pt-16 pb-24 md:pb-0 min-h-screen">
+            {children}
+          </main>
+          <Footer />
+          <MobileNav />
+        </SessionWrapper>
       </body>
     </html>
   );

@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
+import { useSession, signOut } from 'next-auth/react';
 import { Menu, X, Leaf, Map, Film, Info, Camera, Shield, User, Newspaper, Target, ShieldCheck, Trees, LogIn, LogOut, ChevronRight, Trophy } from 'lucide-react';
 
-import { createClient } from '@/lib/supabase/client';
 import { translations } from '@/lib/i18n';
 import { GlobalSearch } from '@/components/GlobalSearch';
 import { NotificationBell } from '@/components/NotificationBell';
@@ -12,12 +12,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export function Navbar() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [user, setUser] = useState<{ id: string } | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const { data: session } = useSession();
   const [lang, setLang] = useState<'fr' | 'ee' | 'kby'>('fr');
-  const supabase = createClient();
 
   const t = translations[lang];
+  const user = session?.user;
+  // @ts-ignore
+  const isAdmin = session?.user?.role === 'admin';
 
   const mainNavItems = [
     { name: t.obs, href: '/observatoire', icon: Leaf },
@@ -31,22 +32,6 @@ export function Navbar() {
     { name: 'À propos', href: '/a-propos', icon: Info },
   ];
 
-  useEffect(() => {
-    const checkUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      setUser(user);
-      if (user) {
-        const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-        if (profile?.role === 'admin') setIsAdmin(true);
-      }
-    };
-    checkUser();
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-    return () => subscription.unsubscribe();
-  }, [supabase]);
-
   const sidebarNavItems = [
     ...mainNavItems,
     { name: '🎮 Classement', href: '/classement', icon: Trophy },
@@ -55,7 +40,6 @@ export function Navbar() {
 
   return (
     <>
-      {/* Top Navbar */}
       <nav className="fixed top-0 w-full z-[100] bg-white/80 backdrop-blur-md border-b border-stone-100 shadow-sm h-16">
         <div className="max-w-7xl mx-auto px-4 h-full flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -79,8 +63,12 @@ export function Navbar() {
             {user ? (
               <div className="flex items-center gap-2">
                 <NotificationBell />
-                <Link href="/profil" className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 border border-green-200">
-                  <User className="h-4 w-4" />
+                <Link href="/profil" className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 border border-green-200 overflow-hidden">
+                  {user.image ? (
+                    <img src={user.image} alt={user.name || ''} className="w-full h-full object-cover" />
+                  ) : (
+                    <User className="h-4 w-4" />
+                  )}
                 </Link>
               </div>
             ) : (
@@ -92,7 +80,6 @@ export function Navbar() {
         </div>
       </nav>
 
-      {/* Left Sidebar Overlay */}
       <AnimatePresence>
         {isSidebarOpen && (
           <>
@@ -159,7 +146,7 @@ export function Navbar() {
                 </div>
                 {user && (
                   <button
-                    onClick={() => { supabase.auth.signOut(); setIsSidebarOpen(false); }}
+                    onClick={() => { signOut(); setIsSidebarOpen(false); }}
                     className="w-full py-3 rounded-xl border border-red-100 text-red-600 font-bold text-xs flex items-center justify-center gap-2 hover:bg-red-50 transition-all"
                   >
                     <LogOut className="h-4 w-4" /> Déconnexion

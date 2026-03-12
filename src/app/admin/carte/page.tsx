@@ -2,10 +2,10 @@
 
 import React, { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
-import { createClient } from '@/lib/supabase/client';
 import { Map as MapIcon, Loader2, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 
 const MapEditor = dynamic(() => import('@/components/MapEditor'), {
   ssr: false,
@@ -13,36 +13,21 @@ const MapEditor = dynamic(() => import('@/components/MapEditor'), {
 });
 
 export default function AdminCartePage() {
-  const [, setIsAdmin] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const { data: session, status: authStatus } = useSession();
   const router = useRouter();
-  const supabase = createClient();
 
   useEffect(() => {
-    async function checkAdmin() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
+    if (authStatus === 'unauthenticated') {
         router.push('/connexion');
-        return;
-      }
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single();
-
-      if (profile?.role !== 'admin') {
-        router.push('/');
-      } else {
-        setIsAdmin(true);
-      }
-      setLoading(false);
+    } else if (authStatus === 'authenticated') {
+        // @ts-ignore
+        if (session?.user?.role !== 'admin') {
+            router.push('/');
+        }
     }
-    checkAdmin();
-  }, [router, supabase]);
+  }, [authStatus, session, router]);
 
-  if (loading) return <div className="flex justify-center py-24"><Loader2 className="animate-spin text-green-600" /></div>;
+  if (authStatus === 'loading') return <div className="flex justify-center py-24"><Loader2 className="animate-spin text-green-600" /></div>;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-12">

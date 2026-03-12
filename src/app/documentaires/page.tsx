@@ -1,29 +1,17 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { Play, Film, Loader2, X } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
-
-interface Documentary {
-  id: string;
-  title: string;
-  description: string;
-  video_url: string;
-  thumbnail_url: string;
-  duration: string;
-  category: string;
-}
+import { getAllDocumentaries } from '@/lib/actions';
 
 export default function DocumentairesPage() {
-  const [docs, setDocs] = useState<Documentary[]>([]);
-  const [selectedDoc, setSelectedDoc] = useState<Documentary | null>(null);
+  const [docs, setDocs] = useState<any[]>([]);
+  const [selectedDoc, setSelectedDoc] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('Tous');
-  const supabase = createClient();
 
-  // Fonction pour transformer n'importe quel lien YouTube en lien d'intégration (embed)
   const getEmbedUrl = (url: string) => {
     let videoId = '';
     if (url.includes('v=')) {
@@ -38,15 +26,12 @@ export default function DocumentairesPage() {
 
   useEffect(() => {
     async function fetchDocs() {
-      const { data } = await supabase
-        .from('documentaries')
-        .select('*')
-        .order('created_at', { ascending: false });
-      if (data) setDocs(data);
+      const data = await getAllDocumentaries();
+      setDocs(data || []);
       setLoading(false);
     }
     fetchDocs();
-  }, [supabase]);
+  }, []);
 
   const categories = ['Tous', ...Array.from(new Set(docs.map(d => d.category)))];
   const filteredDocs = filter === 'Tous' ? docs : docs.filter(d => d.category === filter);
@@ -55,12 +40,11 @@ export default function DocumentairesPage() {
     <div className="min-h-screen bg-white text-stone-900 pt-12 pb-24">
       <div className="max-w-7xl mx-auto px-4">
 
-        {/* Lecteur Vidéo Intégré */}
         {selectedDoc && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-100/95 backdrop-blur-md">
             <div className="w-full max-w-5xl aspect-video relative bg-black rounded-3xl overflow-hidden shadow-2xl border border-stone-200">
               <iframe
-                src={getEmbedUrl(selectedDoc.video_url)}
+                src={getEmbedUrl(selectedDoc.videoUrl)}
                 className="w-full h-full"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
@@ -86,7 +70,7 @@ export default function DocumentairesPage() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {categories.map((cat) => (
+            {categories.map((cat: any) => (
               <button
                 key={cat}
                 onClick={() => setFilter(cat)}
@@ -113,7 +97,7 @@ export default function DocumentairesPage() {
               >
                 <div className="relative aspect-video bg-stone-100">
                   <Image
-                    src={doc.thumbnail_url}
+                    src={doc.thumbnailUrl || ''}
                     alt={doc.title}
                     className="object-cover opacity-90 group-hover:opacity-100 transition-opacity"
                     fill

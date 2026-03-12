@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { getAllQuizzes, getQuizQuestions, saveQuizResult } from '@/lib/actions';
 import { Brain, Trophy, ArrowRight, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
@@ -11,15 +11,15 @@ interface Quiz {
   title: string;
   description: string;
   difficulty: string;
-  image_url: string;
+  imageUrl: string | null;
 }
 
 interface Question {
   id: string;
-  question_text: string;
+  questionText: string;
   options: string[];
-  correct_index: number;
-  explanation: string;
+  correctIndex: number;
+  explanation: string | null;
 }
 
 export default function QuizPage() {
@@ -33,22 +33,20 @@ export default function QuizPage() {
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [isCorrect, setIsCorrect] = useState<boolean | null>(null);
 
-  const supabase = createClient();
-
   useEffect(() => {
     async function fetchQuizzes() {
-      const { data } = await supabase.from('quizzes').select('*');
-      if (data) setQuizzes(data);
+      const data = await getAllQuizzes();
+      setQuizzes(data as any[]);
       setLoading(false);
     }
     fetchQuizzes();
-  }, [supabase]);
+  }, []);
 
   const startQuiz = async (quiz: Quiz) => {
     setLoading(true);
-    const { data } = await supabase.from('questions').select('*').eq('quiz_id', quiz.id);
+    const data = await getQuizQuestions(quiz.id);
     if (data) {
-      setQuestions(data);
+      setQuestions(data as any[]);
       setActiveQuiz(quiz);
       setCurrentIndex(0);
       setScore(0);
@@ -60,7 +58,7 @@ export default function QuizPage() {
   const handleAnswer = (index: number) => {
     if (selectedOption !== null) return;
     setSelectedOption(index);
-    const correct = index === questions[currentIndex].correct_index;
+    const correct = index === questions[currentIndex].correctIndex;
     setIsCorrect(correct);
     if (correct) setScore(score + 1);
 
@@ -71,20 +69,18 @@ export default function QuizPage() {
         setIsCorrect(null);
       } else {
         setShowResult(true);
-        saveResult();
+        saveResult(score + (correct ? 1 : 0));
       }
     }, 2000);
   };
 
-  const saveResult = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      await supabase.from('quiz_results').insert([{
-        user_id: user.id,
-        quiz_id: activeQuiz?.id,
-        score: score,
-        total_questions: questions.length
-      }]);
+  const saveResult = async (finalScore: number) => {
+    if (activeQuiz) {
+        await saveQuizResult({
+            quizId: activeQuiz.id,
+            score: finalScore,
+            totalQuestions: questions.length
+        });
     }
   };
 
@@ -109,7 +105,7 @@ export default function QuizPage() {
               onClick={() => startQuiz(quiz)}
             >
               <div className="h-48 bg-stone-100 relative">
-                <Image src={quiz.image_url} className="object-cover" alt={quiz.title} fill />
+                {quiz.imageUrl && <Image src={quiz.imageUrl} className="object-cover" alt={quiz.title} fill />}
                 <div className="absolute top-4 right-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-[10px] font-bold text-green-600 uppercase tracking-widest z-10">{quiz.difficulty}</div>
               </div>
               <div className="p-8">
@@ -145,7 +141,7 @@ export default function QuizPage() {
             </div>
           </div>
 
-          <h2 className="text-2xl font-bold text-stone-900 mb-10 leading-relaxed">{questions[currentIndex].question_text}</h2>
+          <h2 className="text-2xl font-bold text-stone-900 mb-10 leading-relaxed">{questions[currentIndex].questionText}</h2>
 
           <div className="space-y-4">
             {questions[currentIndex].options.map((option, index) => (
@@ -158,7 +154,7 @@ export default function QuizPage() {
                   }`}
               >
                 {option}
-                {selectedOption === index && (isCorrect ? <CheckCircle className="h-5 w-5" /> : <X className="h-5 w-5" />)}
+                {selectedOption === index && (isCorrect ? <CheckCircle className="h-5 w-5" /> : <XIcon className="h-5 w-5" />)}
               </button>
             ))}
           </div>
@@ -178,6 +174,6 @@ function CheckCircle({ className }: { className?: string }) {
   return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>;
 }
 
-function X({ className }: { className?: string }) {
+function XIcon({ className }: { className?: string }) {
   return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>;
 }

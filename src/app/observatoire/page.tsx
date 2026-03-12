@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useEffect, useState, Suspense, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { Leaf, Search, Loader2, X, Share2, Heart, MessageSquare, Send, User, MapPin, Trees } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useSession } from 'next-auth/react';
+import { getAllSpecies, getSpeciesComments, addSpeciesComment, getFavorites, toggleFavorite as toggleFavAction } from '@/lib/actions';
 
 const MiniMap = dynamic(() => import('@/components/Map'), {
   ssr: false,
@@ -17,14 +18,14 @@ const MiniMap = dynamic(() => import('@/components/Map'), {
 interface Species {
   id: string;
   name: string;
-  scientific_name: string;
-  description: string;
-  conservation_status: string;
-  image_url: string;
-  category: 'Fauna' | 'Flora';
-  habitat?: string;
-  diet?: string;
-  population_estimate?: string;
+  scientificName: string | null;
+  description: string | null;
+  conservationStatus: string | null;
+  imageUrl: string | null;
+  category: 'Fauna' | 'Flora' | null;
+  habitat: string | null;
+  diet: string | null;
+  populationEstimate: string | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -34,17 +35,19 @@ const statusColors: Record<string, string> = {
 const statusLabels: Record<string, string> = {
   'CR': 'En danger critique', 'EN': 'En danger', 'VU': 'Vulnérable', 'NT': 'Quasi menacé', 'LC': 'Préoccupation mineure',
 };
+
 interface SpeciesComment {
   id: string;
   content: string;
-  created_at: string;
-  profiles: {
-    full_name: string;
-    avatar_url: string | null;
+  createdAt: Date | null;
+  user: {
+    name: string | null;
+    image: string | null;
   } | null;
 }
 
 function ObservatoireContent() {
+  const { data: session } = useSession();
   const [species, setSpecies] = useState<Species[]>([]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [selectedSpecies, setSelectedSpecies] = useState<Species | null>(null);
@@ -54,26 +57,35 @@ function ObservatoireContent() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const supabase = createClient();
   const searchParams = useSearchParams();
   const speciesIdFromUrl = searchParams.get('id');
 
   const fetchComments = useCallback(async (speciesId: string) => {
-    const { data } = await supabase
-      .from('comments')
-      .select('*, profiles(full_name, avatar_url)')
-      .eq('species_id', speciesId)
-      .order('created_at', { ascending: true });
-    if (data) setComments(data);
-  }, [supabase]);
+    const data = await getSpeciesComments(speciesId);
+    if (data) setComments(data as any);
+  }, []);
 
   useEffect(() => {
     async function fetchData() {
-      const { data: speciesData } = await supabase.from('species').select('*').order('name');
+      const speciesData = await getAllSpecies();
       if (speciesData) {
-        setSpecies(speciesData);
+        // Map Drizzle fields to component interface
+        const mappedSpecies = speciesData.map((s: any) => ({
+            id: s.id,
+            name: s.name,
+            scientificName: s.scientificName,
+            description: s.description,
+            conservationStatus: s.conservationStatus,
+            imageUrl: s.imageUrl,
+            category: s.category,
+            habitat: s.habitat,
+            diet: s.diet,
+            populationEstimate: s.populationEstimate
+        }));
+        setSpecies(mappedSpecies);
+        
         if (speciesIdFromUrl) {
-          const target = speciesData.find(s => s.id === speciesIdFromUrl);
+          const target = mappedSpecies.find((s: any) => s.id === speciesIdFromUrl);
           if (target) {
             setSelectedSpecies(target);
             fetchComments(target.id);
@@ -81,64 +93,70 @@ function ObservatoireContent() {
         }
       }
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: favData } = await supabase.from('favorites').select('species_id').eq('user_id', user.id);
-        if (favData) setFavorites(favData.map(f => f.species_id));
+      if (session?.user) {
+        const favData = await getFavorites();
+        setFavorites(favData);
       }
       setLoading(false);
     }
     fetchData();
-  }, [supabase, speciesIdFromUrl, fetchComments]);
+  }, [session, speciesIdFromUrl, fetchComments]);
 
   const toggleFavorite = async (speciesId: string) => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return alert("Connectez-vous !");
-    if (favorites.includes(speciesId)) {
-      await supabase.from('favorites').delete().eq('user_id', user.id).eq('species_id', speciesId);
-      setFavorites(favorites.filter(id => id !== speciesId));
-    } else {
-      await supabase.from('favorites').insert([{ user_id: user.id, species_id: speciesId }]);
-      setFavorites([...favorites, speciesId]);
+    if (!session?.user) return alert("Connectez-vous !");
+    try {
+        const result = await toggleFavAction(speciesId);
+        if (result.action === 'added') {
+            setFavorites([...favorites, speciesId]);
+        } else {
+            setFavorites(favorites.filter(id => id !== speciesId));
+        }
+    } catch (error) {
+        alert("Erreur lors de la mise à jour des favoris");
     }
   };
 
   const handleSendComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newComment.trim()) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return alert("Connectez-vous !");
-    await supabase.from('comments').insert([{ user_id: user.id, species_id: selectedSpecies?.id, content: newComment }]);
-    setNewComment('');
-    fetchComments(selectedSpecies!.id);
+    if (!session?.user) return alert("Connectez-vous !");
+    
+    const result = await addSpeciesComment(selectedSpecies!.id, newComment);
+    if (result.success) {
+        setNewComment('');
+        fetchComments(selectedSpecies!.id);
+    }
   };
 
   const filteredSpecies = species.filter(s =>
     s.category === activeCategory &&
-    (s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.scientific_name?.toLowerCase().includes(searchTerm.toLowerCase()))
+    (s.name.toLowerCase().includes(searchTerm.toLowerCase()) || s.scientificName?.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   return (
     <div className="max-w-7xl mx-auto">
-      {/* Modal Détail (inchangé mais inclus dans le fichier) */}
       <AnimatePresence>
         {selectedSpecies && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-100/90 backdrop-blur-md">
             <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }} className="bg-white w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl relative border border-stone-200">
               <div className="relative h-64 md:h-96">
-                <Image src={selectedSpecies.image_url} className="object-cover" alt={selectedSpecies.name} fill />
+                {selectedSpecies.imageUrl && <Image src={selectedSpecies.imageUrl} className="object-cover" alt={selectedSpecies.name} fill />}
                 <button onClick={() => setSelectedSpecies(null)} className="absolute top-4 right-4 bg-white shadow-lg text-stone-900 p-2 rounded-full hover:bg-stone-100 transition-all z-10"><X className="h-6 w-6" /></button>
               </div>
               <div className="p-8">
                 <div className="flex flex-col md:flex-row justify-between items-start mb-6 gap-4">
-                  <div><h2 className="text-3xl font-bold text-stone-900">{selectedSpecies.name}</h2><p className="text-lg italic text-green-600">{selectedSpecies.scientific_name}</p></div>
+                  <div><h2 className="text-3xl font-bold text-stone-900">{selectedSpecies.name}</h2><p className="text-lg italic text-green-600">{selectedSpecies.scientificName}</p></div>
                   <div className="flex flex-col items-end gap-2">
-                    <div className={`px-4 py-2 rounded-xl text-sm font-bold text-white ${statusColors[selectedSpecies.conservation_status]}`}>{statusLabels[selectedSpecies.conservation_status]}</div>
+                    {selectedSpecies.conservationStatus && (
+                        <div className={`px-4 py-2 rounded-xl text-sm font-bold text-white ${statusColors[selectedSpecies.conservationStatus] || 'bg-stone-400'}`}>
+                            {statusLabels[selectedSpecies.conservationStatus] || selectedSpecies.conservationStatus}
+                        </div>
+                    )}
                     <button onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent("Découvrez le " + selectedSpecies.name + " sur Eco-Atlas Togo 🇹🇬")}`, '_blank')} className="flex items-center text-[10px] font-bold text-green-600 bg-green-50 px-3 py-1.5 rounded-lg hover:bg-green-100 transition-all"><Share2 className="h-3 w-3 mr-1" /> WhatsApp</button>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                  {[{ label: 'Habitat', value: selectedSpecies.habitat }, { label: 'Régime', value: selectedSpecies.diet }, { label: 'Population', value: selectedSpecies.population_estimate }].map((item, i) => (
+                  {[{ label: 'Habitat', value: selectedSpecies.habitat }, { label: 'Régime', value: selectedSpecies.diet }, { label: 'Population', value: selectedSpecies.populationEstimate }].map((item, i) => (
                     <div key={i} className="bg-stone-50 p-4 rounded-2xl border border-stone-100">
                       <h4 className="text-[10px] font-bold text-stone-400 uppercase tracking-widest mb-1">{item.label}</h4>
                       <p className="text-sm font-bold text-stone-700">{item.value || "Non renseigné"}</p>
@@ -152,8 +170,8 @@ function ObservatoireContent() {
                   <div className="space-y-6 mb-8">
                     {comments.map((c) => (
                       <div key={c.id} className="flex space-x-4">
-                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-stone-200 overflow-hidden flex-shrink-0 relative">{c.profiles?.avatar_url ? <Image src={c.profiles.avatar_url} className="object-cover" alt="Avatar" fill /> : <User className="h-5 w-5 text-stone-300" />}</div>
-                        <div className="flex-1"><div className="bg-white p-4 rounded-2xl border border-stone-100 shadow-sm"><p className="font-bold text-xs text-stone-900 mb-1">{c.profiles?.full_name || "Éco-citoyen"}</p><p className="text-sm text-stone-600">{c.content}</p></div></div>
+                        <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center border border-stone-200 overflow-hidden flex-shrink-0 relative">{c.user?.image ? <Image src={c.user.image} className="object-cover" alt="Avatar" fill /> : <User className="h-5 w-5 text-stone-300" />}</div>
+                        <div className="flex-1"><div className="bg-white p-4 rounded-2xl border border-stone-100 shadow-sm"><p className="font-bold text-xs text-stone-900 mb-1">{c.user?.name || "Éco-citoyen"}</p><p className="text-sm text-stone-600">{c.content}</p></div></div>
                       </div>
                     ))}
                   </div>
@@ -183,13 +201,13 @@ function ObservatoireContent() {
           {filteredSpecies.map((s) => (
             <div key={s.id} className="bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden hover:shadow-xl transition-all group">
               <div className="relative h-64 bg-stone-100">
-                <Image src={s.image_url} alt={s.name} className="object-cover opacity-90 group-hover:opacity-100 transition-opacity" fill />
-                <div className={`absolute z-10 top-4 right-4 px-3 py-1 rounded-full text-[10px] font-bold text-white uppercase ${statusColors[s.conservation_status]}`}>{s.conservation_status}</div>
+                {s.imageUrl && <Image src={s.imageUrl} alt={s.name} className="object-cover opacity-90 group-hover:opacity-100 transition-opacity" fill />}
+                {s.conservationStatus && <div className={`absolute z-10 top-4 right-4 px-3 py-1 rounded-full text-[10px] font-bold text-white uppercase ${statusColors[s.conservationStatus] || 'bg-stone-400'}`}>{s.conservationStatus}</div>}
                 <button onClick={(e) => { e.stopPropagation(); toggleFavorite(s.id); }} className="absolute bottom-4 right-4 w-10 h-10 bg-white/90 backdrop-blur shadow-lg rounded-full flex items-center justify-center hover:scale-110 transition-all"><Heart className={`h-5 w-5 ${favorites.includes(s.id) ? 'text-red-500 fill-current' : 'text-stone-400'}`} /></button>
               </div>
               <div className="p-6">
                 <h3 className="text-xl font-bold text-stone-900 mb-1">{s.name}</h3>
-                <p className="text-sm italic text-stone-500 mb-4">{s.scientific_name}</p>
+                <p className="text-sm italic text-stone-500 mb-4">{s.scientificName}</p>
                 <Link
                   href={`/observatoire/${s.id}`}
                   className="block w-full py-3 bg-stone-900 text-white font-bold rounded-xl hover:bg-green-600 transition-colors text-center"
@@ -197,7 +215,6 @@ function ObservatoireContent() {
                   Voir la fiche
                 </Link>
               </div>
-
             </div>
           ))}
         </div>

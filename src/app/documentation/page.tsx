@@ -1,35 +1,10 @@
-'use client';
+import React from 'react';
+import { FileText, Download, Gavel, BookOpen } from 'lucide-react';
+import * as motion from 'framer-motion/client';
+import { getAllDocuments } from '@/lib/actions';
 
-import React, { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import { FileText, Download, Gavel, BookOpen, Loader2 } from 'lucide-react';
-import { motion } from 'framer-motion';
-
-interface DocumentItem {
-  id: string;
-  title: string;
-  description: string;
-  category: string;
-  file_url: string;
-  created_at: string;
-  size_mb: number;
-}
-
-export default function DocumentationPage() {
-  const [docs, setDocs] = useState<DocumentItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const supabase = createClient();
-
-  useEffect(() => {
-    async function fetchDocs() {
-      const { data } = await supabase.from('documents').select('*').order('created_at', { ascending: false });
-      if (data) setDocs(data);
-      setLoading(false);
-    }
-    fetchDocs();
-  }, [supabase]);
-
-  if (loading) return <div className="flex justify-center py-24"><Loader2 className="animate-spin text-green-600 h-10 w-10" /></div>;
+export default async function DocumentationPage() {
+  const docs = await getAllDocuments();
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-12 bg-white min-h-screen">
@@ -42,12 +17,9 @@ export default function DocumentationPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
         <div className="lg:col-span-2 space-y-6">
-          {docs.length > 0 ? docs.map((doc, index) => (
-            <motion.div
+          {docs.length > 0 ? docs.map((doc: any, index: number) => (
+            <div
               key={doc.id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.1 }}
               className="bg-white p-6 rounded-3xl border border-stone-100 shadow-sm hover:shadow-xl transition-all flex items-center justify-between group"
             >
               <div className="flex items-center space-x-6">
@@ -63,13 +35,13 @@ export default function DocumentationPage() {
                 </div>
               </div>
               <a
-                href={doc.file_url}
+                href={doc.fileUrl}
                 target="_blank"
                 className="p-4 bg-stone-900 text-white rounded-2xl hover:bg-green-600 transition-all shadow-lg"
               >
                 <Download className="h-5 w-5" />
               </a>
-            </motion.div>
+            </div>
           )) : (
             <div className="text-center py-24 bg-stone-50 rounded-3xl border-2 border-dashed border-stone-200">
               <p className="text-stone-400 font-medium">Aucun document disponible pour le moment.</p>

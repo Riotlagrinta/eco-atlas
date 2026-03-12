@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import webpush from 'web-push';
-import { createClient } from '@supabase/supabase-js';
+import { db } from '@/lib/db';
+import { notifications, pushSubscriptions, notificationPreferences } from '@/lib/db/schema';
+import { eq, and } from 'drizzle-orm';
 
 // Initialisation lazy de VAPID
 let vapidInitialized = false;
@@ -14,19 +16,11 @@ function initVapid() {
     }
 }
 
-// Initialisation lazy du client Supabase admin
-function getSupabaseAdmin() {
-    return createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-}
-
 export async function POST(req: NextRequest) {
     initVapid();
     try {
         const { title, body, type, userId, relatedId, radiusKm, location } = await req.json() as {
-            title: string; body: string; type: string; userId?: string;
+            title: string; body: string; type: 'alert' | 'badge' | 'challenge' | 'community' | 'system'; userId?: string;
             relatedId?: string; radiusKm?: number; location?: string;
         };
 
@@ -52,31 +46,29 @@ export async function POST(req: NextRequest) {
     }
 }
 
-async function sendToUser(userId: string, title: string, body: string, type: string, relatedId?: string) {
-    const admin = getSupabaseAdmin();
-
+async function sendToUser(userId: string, title: string, body: string, type: 'alert' | 'badge' | 'challenge' | 'community' | 'system', relatedId?: string) {
     // Sauvegarder la notification en BDD
-    await admin.from('notifications').insert({
-        user_id: userId, title, body,
+    await db.insert(notifications).values({
+        userId, 
+        title, 
+        body,
         type: type || 'system',
-        related_id: relatedId || null,
     });
 
     // Envoyer le push
-    const { data: subs } = await admin
-        .from('push_subscriptions')
-        .select('endpoint, p256dh, auth')
-        .eq('user_id', userId);
+    const subs = await db.query.pushSubscriptions.findMany({
+        where: eq(pushSubscriptions.userId, userId)
+    });
 
     if (subs) {
-        for (const sub of subs as unknown as { endpoint: string; p256dh: string; auth: string }[]) {
+        for (const sub of subs) {
             try {
                 await webpush.sendNotification(
                     { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
                     JSON.stringify({ title, body, type })
                 );
             } catch {
-                await admin.from('push_subscriptions').delete().eq('endpoint', sub.endpoint);
+                await db.delete(pushSubscriptions).where(eq(pushSubscriptions.endpoint, sub.endpoint));
             }
         }
     }
@@ -84,23 +76,25 @@ async function sendToUser(userId: string, title: string, body: string, type: str
 
 async function sendToNearbyUsers(
     location: string, radiusKm: number,
-    title: string, body: string, type: string, relatedId?: string
+    title: string, body: string, type: 'alert' | 'badge' | 'challenge' | 'community' | 'system', relatedId?: string
 ): Promise<number> {
     const match = location.match(/POINT\(([\d.-]+)\s+([\d.-]+)\)/);
     if (!match) return 0;
 
-    const admin = getSupabaseAdmin();
-
-    const { data: nearbyUsers } = await admin
-        .from('notification_preferences')
-        .select('user_id')
-        .eq('push_enabled', true);
+    // Dans cette version simplifiée, on envoie à tous ceux qui ont activé le push
+    // Une implémentation réelle filtrerait par localisation avec PostGIS
+    const nearbyUsers = await db.query.notificationPreferences.findMany({
+        where: eq(notificationPreferences.pushEnabled, true),
+        columns: {
+            userId: true
+        }
+    });
 
     if (!nearbyUsers || nearbyUsers.length === 0) return 0;
 
     let sentCount = 0;
-    for (const u of nearbyUsers as unknown as { user_id: string }[]) {
-        await sendToUser(u.user_id, title, body, type, relatedId);
+    for (const u of nearbyUsers) {
+        await sendToUser(u.userId, title, body, type, relatedId);
         sentCount++;
     }
 

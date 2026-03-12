@@ -7,7 +7,8 @@ import 'leaflet/dist/leaflet.css';
 import 'leaflet.heat';
 import { FullscreenControl } from 'react-leaflet-fullscreen';
 import { useEffect, useState, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import { useSession } from 'next-auth/react';
+import { getProtectedAreasGeoJSON, getVerifiedObservationsGeoJSON, getUpcomingEvents, verifyObservation, deleteObservation } from '@/lib/actions';
 import { LocateFixed, Ruler, Check, X as CloseIcon } from 'lucide-react';
 import { OpenStreetMapProvider, GeoSearchControl } from 'leaflet-geosearch';
 import 'leaflet-geosearch/dist/geosearch.css';
@@ -105,46 +106,31 @@ export default function Map({ center = [8.6195, 1.1915], zoom = 7, filter = 'all
   const [areas, setAreas] = useState<ProtectedArea[]>([]);
   const [observations, setObservations] = useState<Observation[]>([]);
   const [events, setEvents] = useState<Event[]>([]);
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const supabase = createClient();
+  const { data: session } = useSession();
+  const userRole = (session?.user as any)?.role || 'user';
 
   const fetchData = useCallback(async () => {
     if (filter === 'all' || filter === 'parks') {
-      const { data } = await supabase.rpc('get_protected_areas_geojson');
-      if (data) setAreas(data);
+      const data = await getProtectedAreasGeoJSON();
+      if (data) setAreas(data as any);
     } else setAreas([]);
 
     if (filter === 'all' || filter === 'species') {
-      const { data: obsData } = await supabase.rpc('get_verified_observations_geojson');
-      if (obsData) setObservations(obsData);
+      const obsData = await getVerifiedObservationsGeoJSON();
+      if (obsData) setObservations(obsData as any);
     } else setObservations([]);
 
-    const { data: eventData } = await supabase.from('events').select('*, coordinates:location').gte('event_date', new Date().toISOString());
-    if (eventData) setEvents(eventData as unknown as Event[]);
-  }, [filter, supabase]);
+    const eventData = await getUpcomingEvents();
+    if (eventData) setEvents(eventData as any);
+  }, [filter]);
 
   useEffect(() => {
-    const checkRole = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-        setUserRole(data?.role || 'user');
-      }
-    };
-    checkRole();
-
-    const initFetch = async () => {
-      await fetchData();
-    };
-    initFetch();
-
-    const channel = supabase.channel('schema-db-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'observations' }, () => { initFetch(); }).subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [filter, supabase, fetchData]);
+    fetchData();
+  }, [fetchData]);
 
   const handleModerate = async (id: string, action: 'verify' | 'delete') => {
-    if (action === 'verify') await supabase.from('observations').update({ is_verified: true }).eq('id', id);
-    else if (confirm("Supprimer ?")) await supabase.from('observations').delete().eq('id', id);
+    if (action === 'verify') await verifyObservation(id, true);
+    else if (confirm("Supprimer ?")) await deleteObservation(id);
     fetchData();
   };
 

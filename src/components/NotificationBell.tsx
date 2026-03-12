@@ -3,17 +3,17 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Bell, X, AlertTriangle, Award, Target, MessageSquare, Info } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { getUnreadNotifications, markAsRead, markAllAsRead } from '@/lib/push-notifications';
-import { createClient } from '@/lib/supabase/client';
+import { getUnreadNotifications, markNotificationAsRead, markAllNotificationsAsRead } from '@/lib/actions';
+import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 
 interface Notification {
     id: string;
     title: string;
-    body: string;
-    type: 'alert' | 'badge' | 'challenge' | 'community' | 'system';
-    is_read: boolean;
-    created_at: string;
+    body: string | null;
+    type: 'alert' | 'badge' | 'challenge' | 'community' | 'system' | null;
+    isRead: boolean | null;
+    createdAt: Date | null;
 }
 
 const typeConfig: Record<string, { icon: React.ReactNode; color: string; bg: string }> = {
@@ -27,42 +27,38 @@ const typeConfig: Record<string, { icon: React.ReactNode; color: string; bg: str
 export function NotificationBell() {
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [isOpen, setIsOpen] = useState(false);
-    const [userId, setUserId] = useState<string | null>(null);
+    const { data: session } = useSession();
 
     const fetchNotifications = useCallback(async () => {
-        if (!userId) return;
-        const data = await getUnreadNotifications(userId);
+        if (!session?.user) return;
+        const data = await getUnreadNotifications();
         setNotifications(data as Notification[]);
-    }, [userId]);
+    }, [session]);
 
     useEffect(() => {
-        const supabase = createClient();
-        supabase.auth.getUser().then(({ data: { user } }) => {
-            if (user) setUserId(user.id);
-        });
-    }, []);
-
-    useEffect(() => {
-        fetchNotifications();
-        // Rafraîchir toutes les 30 secondes
-        const interval = setInterval(fetchNotifications, 30000);
-        return () => clearInterval(interval);
-    }, [fetchNotifications]);
+        if (session?.user) {
+            fetchNotifications();
+            // Rafraîchir toutes les 30 secondes
+            const interval = setInterval(fetchNotifications, 30000);
+            return () => clearInterval(interval);
+        }
+    }, [fetchNotifications, session]);
 
     const handleMarkRead = async (id: string) => {
-        await markAsRead(id);
+        await markNotificationAsRead(id);
         setNotifications(prev => prev.filter(n => n.id !== id));
     };
 
     const handleMarkAllRead = async () => {
-        if (!userId) return;
-        await markAllAsRead(userId);
+        if (!session?.user) return;
+        await markAllNotificationsAsRead();
         setNotifications([]);
         setIsOpen(false);
     };
 
-    const timeAgo = (dateStr: string) => {
-        const diff = Date.now() - new Date(dateStr).getTime();
+    const timeAgo = (date: Date | null) => {
+        if (!date) return "";
+        const diff = Date.now() - new Date(date).getTime();
         const minutes = Math.floor(diff / 60000);
         if (minutes < 1) return "À l'instant";
         if (minutes < 60) return `il y a ${minutes}min`;
@@ -129,7 +125,7 @@ export function NotificationBell() {
                                     </div>
                                 ) : (
                                     notifications.map(notif => {
-                                        const config = typeConfig[notif.type] || typeConfig.system;
+                                        const config = (notif.type && typeConfig[notif.type]) || typeConfig.system;
                                         return (
                                             <motion.div
                                                 key={notif.id}
@@ -144,7 +140,7 @@ export function NotificationBell() {
                                                 <div className="flex-1 min-w-0">
                                                     <p className="font-bold text-stone-900 text-sm truncate">{notif.title}</p>
                                                     <p className="text-xs text-stone-400 line-clamp-2">{notif.body}</p>
-                                                    <p className="text-[10px] text-stone-300 mt-1">{timeAgo(notif.created_at)}</p>
+                                                    <p className="text-[10px] text-stone-300 mt-1">{timeAgo(notif.createdAt)}</p>
                                                 </div>
                                             </motion.div>
                                         );

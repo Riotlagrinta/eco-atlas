@@ -1,4 +1,6 @@
-import { createClient } from '@/lib/supabase/client';
+import { db } from '@/lib/db';
+import { userLevels, challenges, userChallenges, users } from '@/lib/db/schema';
+import { eq, and, gte, desc, sql } from 'drizzle-orm';
 
 // === BARÈME XP ===
 export const XP_REWARDS = {
@@ -25,7 +27,6 @@ const RANKS = [
 
 /** XP requis pour atteindre un niveau donné */
 export function xpForLevel(level: number): number {
-    // Courbe progressive : chaque niveau demande un peu plus
     return Math.floor(100 * Math.pow(level, 1.5));
 }
 
@@ -45,29 +46,32 @@ export function getProgressPercent(xp: number, level: number): number {
     return Math.max(0, Math.min(100, progress));
 }
 
-// === API SUPABASE ===
+// === API DRIZZLE ===
 
 /** Récupérer ou créer le profil de gamification d'un utilisateur */
 export async function getUserLevel(userId: string) {
-    const supabase = createClient();
+    try {
+        let levelData = await db.query.userLevels.findFirst({
+            where: eq(userLevels.userId, userId),
+        });
 
-    const { data, error } = await supabase
-        .from('user_levels')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
+        if (!levelData) {
+            // Créer le profil si inexistant
+            const result = await db.insert(userLevels).values({
+                userId,
+                xp: 0,
+                level: 1,
+                rank: '🌱 Explorateur',
+                streakDays: 0,
+            }).returning();
+            levelData = result[0];
+        }
 
-    if (error || !data) {
-        // Créer le profil si inexistant
-        const { data: newData } = await supabase
-            .from('user_levels')
-            .insert({ user_id: userId, xp: 0, level: 1, rank: '🌱 Explorateur', streak_days: 0 })
-            .select()
-            .single();
-        return newData;
+        return levelData;
+    } catch (error) {
+        console.error('Error in getUserLevel:', error);
+        return null;
     }
-
-    return data;
 }
 
 /** Ajouter de l'XP à un utilisateur et gérer le level-up */
@@ -76,13 +80,11 @@ export async function addXP(
     amount: number,
     _reason: string
 ): Promise<{ newXP: number; newLevel: number; leveledUp: boolean; newRank: string }> {
-    const supabase = createClient();
-
     const userLevel = await getUserLevel(userId);
     if (!userLevel) throw new Error('Impossible de récupérer le niveau utilisateur');
 
-    const newXP = userLevel.xp + amount;
-    let newLevel = userLevel.level;
+    const newXP = (userLevel.xp || 0) + amount;
+    let newLevel = userLevel.level || 1;
     let leveledUp = false;
 
     // Vérifier les level-ups consécutifs
@@ -95,111 +97,123 @@ export async function addXP(
 
     // Mettre à jour le streak
     const today = new Date().toISOString().split('T')[0];
-    const lastActivity = userLevel.last_activity_date;
-    let newStreak = userLevel.streak_days;
+    const lastActivity = userLevel.lastActivityDate;
+    let newStreak = userLevel.streakDays || 0;
 
     if (lastActivity !== today) {
         const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
         newStreak = lastActivity === yesterday ? newStreak + 1 : 1;
     }
 
-    await supabase
-        .from('user_levels')
-        .update({
+    await db.update(userLevels)
+        .set({
             xp: newXP,
             level: newLevel,
             rank: newRank,
-            streak_days: newStreak,
-            last_activity_date: today,
+            streakDays: newStreak,
+            lastActivityDate: today,
         })
-        .eq('user_id', userId);
+        .where(eq(userLevels.userId, userId));
 
     return { newXP, newLevel, leveledUp, newRank };
 }
 
 /** Récupérer le classement par région */
 export async function getLeaderboard(region?: string, limit = 10) {
-    const supabase = createClient();
-
-    let query = supabase
-        .from('user_levels')
-        .select('user_id, xp, level, rank, streak_days, profiles(full_name, avatar_url, region)')
-        .order('xp', { ascending: false })
-        .limit(limit);
-
-    if (region) {
-        query = query.eq('profiles.region', region);
+    // Note: 'region' is not in our 'user' table yet, but we'll try to join if it was.
+    // Based on the schema provided, it's missing.
+    try {
+        return await db.query.userLevels.findMany({
+            with: {
+                user: true
+            },
+            orderBy: [desc(userLevels.xp)],
+            limit,
+        });
+    } catch (error) {
+        console.error('Error in getLeaderboard:', error);
+        return [];
     }
-
-    const { data } = await query;
-    return data || [];
 }
 
 /** Récupérer les défis actifs */
 export async function getActiveChallenges() {
-    const supabase = createClient();
     const today = new Date().toISOString().split('T')[0];
-
-    const { data } = await supabase
-        .from('challenges')
-        .select('*')
-        .eq('is_active', true)
-        .gte('end_date', today)
-        .order('end_date', { ascending: true });
-
-    return data || [];
+    try {
+        return await db.query.challenges.findMany({
+            where: and(
+                eq(challenges.isActive, true),
+                gte(challenges.endDate, today)
+            ),
+            orderBy: [challenges.endDate],
+        });
+    } catch (error) {
+        console.error('Error in getActiveChallenges:', error);
+        return [];
+    }
 }
 
 /** Récupérer la progression d'un utilisateur sur les défis */
 export async function getUserChallenges(userId: string) {
-    const supabase = createClient();
-
-    const { data } = await supabase
-        .from('user_challenges')
-        .select('*, challenges(*)')
-        .eq('user_id', userId);
-
-    return data || [];
+    try {
+        return await db.query.userChallenges.findMany({
+            where: eq(userChallenges.userId, userId),
+            with: {
+                challenge: true
+            }
+        });
+    } catch (error) {
+        console.error('Error in getUserChallenges:', error);
+        return [];
+    }
 }
 
 /** Incrémenter la progression d'un défi */
 export async function incrementChallengeProgress(
     userId: string,
-    challengeType: string
+    challengeType: 'observations' | 'species' | 'alerts' | 'quiz' | 'login'
 ) {
-    const supabase = createClient();
-
     // Trouver les défis actifs correspondant au type
-    const activeChallenges = await getActiveChallenges();
-    const matching = activeChallenges.filter(c => c.target_type === challengeType);
+    const activeChalls = await getActiveChallenges();
+    const matching = activeChalls.filter(c => c.targetType === challengeType);
 
     for (const challenge of matching) {
-        // Upsert la progression
-        const { data: existing } = await supabase
-            .from('user_challenges')
-            .select('*')
-            .eq('user_id', userId)
-            .eq('challenge_id', challenge.id)
-            .single();
-
-        if (existing && existing.completed) continue;
-
-        const newProgress = (existing?.progress || 0) + 1;
-        const completed = newProgress >= challenge.target_count;
-
-        await supabase
-            .from('user_challenges')
-            .upsert({
-                user_id: userId,
-                challenge_id: challenge.id,
-                progress: newProgress,
-                completed,
-                completed_at: completed ? new Date().toISOString() : null,
+        try {
+            const existing = await db.query.userChallenges.findFirst({
+                where: and(
+                    eq(userChallenges.userId, userId),
+                    eq(userChallenges.challengeId, challenge.id)
+                )
             });
 
-        // Si défi complété, donner l'XP bonus
-        if (completed && !existing?.completed) {
-            await addXP(userId, challenge.xp_reward, `Défi complété: ${challenge.title}`);
+            if (existing && existing.completed) continue;
+
+            const newProgress = (existing?.progress || 0) + 1;
+            const completed = newProgress >= (challenge.targetCount || 1);
+
+            await db.insert(userChallenges)
+                .values({
+                    userId,
+                    challengeId: challenge.id,
+                    progress: newProgress,
+                    completed,
+                    completedAt: completed ? new Date() : null,
+                })
+                .onConflictDoUpdate({
+                    target: [userChallenges.userId, userChallenges.challengeId],
+                    set: {
+                        progress: newProgress,
+                        completed,
+                        completedAt: completed ? new Date() : null,
+                    }
+                });
+
+            // Si défi complété, donner l'XP bonus
+            if (completed && !existing?.completed) {
+                await addXP(userId, challenge.xpReward || 0, `Défi complété: ${challenge.title}`);
+            }
+        } catch (error) {
+            console.error(`Error incrementing challenge progress for ${challenge.id}:`, error);
         }
     }
 }

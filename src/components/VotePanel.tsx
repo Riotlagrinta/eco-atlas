@@ -1,11 +1,11 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { ThumbsUp, ThumbsDown, HelpCircle, Loader2, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { addXP, XP_REWARDS } from '@/lib/gamification';
 import toast from 'react-hot-toast';
+import { getObservationVotes, voteObservation, getAllSpecies } from '@/lib/actions';
+import { useSession } from 'next-auth/react';
 
 interface VotePanelProps {
     observationId: string;
@@ -13,87 +13,58 @@ interface VotePanelProps {
     onVoteSuccess?: () => void;
 }
 
-interface Vote {
-    vote: 'confirm' | 'reject' | 'unsure';
-    voter_id: string;
-    comment: string | null;
-    profiles: { full_name: string }[] | null;
-}
-
 export function VotePanel({ observationId, compact = false, onVoteSuccess }: VotePanelProps) {
-    const [votes, setVotes] = useState<Vote[]>([]);
+    const { data: session } = useSession();
+    const [votes, setVotes] = useState<any[]>([]);
     const [userVote, setUserVote] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [comment, setComment] = useState('');
-    const [speciesList, setSpeciesList] = useState<{ id: string, name: string }[]>([]);
+    const [speciesList, setSpeciesList] = useState<any[]>([]);
     const [suggestedSpeciesId, setSuggestedSpeciesId] = useState('');
-    const supabase = createClient();
 
-    const fetchVotes = useCallback(async () => {
-        const { data } = await supabase
-            .from('observation_votes')
-            .select('vote, voter_id, comment, profiles:voter_id(full_name)')
-            .eq('observation_id', observationId);
+    const fetchData = useCallback(async () => {
+        try {
+            const [votesData, specData] = await Promise.all([
+                getObservationVotes(observationId),
+                getAllSpecies()
+            ]);
 
-        setVotes((data as unknown as Vote[]) || []);
+            setVotes(votesData || []);
+            setSpeciesList(specData || []);
 
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user && data) {
-            const myVote = (data as unknown as Vote[]).find(v => v.voter_id === user.id);
-            if (myVote) setUserVote(myVote.vote);
+            if (session?.user?.id && votesData) {
+                const myVote = votesData.find((v: any) => v.userId === session.user?.id);
+                if (myVote) setUserVote(myVote.vote);
+            }
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
         }
-
-        // Fetch species for suggestions
-        const { data: specData } = await supabase.from('species').select('id, name').order('name');
-        if (specData) setSpeciesList(specData);
-
-        setLoading(false);
-    }, [supabase, observationId]);
+    }, [observationId, session]);
 
     useEffect(() => {
-        fetchVotes();
-    }, [fetchVotes]);
+        fetchData();
+    }, [fetchData]);
 
     const handleVote = async (vote: 'confirm' | 'reject' | 'unsure') => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return toast.error('Connectez-vous pour voter.');
+        if (!session) return toast.error('Connectez-vous pour voter.');
 
-        const { error } = await supabase.from('observation_votes').upsert({
-            observation_id: observationId,
-            voter_id: user.id,
+        const res = await voteObservation({
+            observationId,
             vote,
-            comment: comment.trim() || null,
-            suggested_species_id: suggestedSpeciesId || null
-        }, { onConflict: 'observation_id,voter_id' });
+            comment: comment.trim() || undefined,
+            suggestedSpeciesId: suggestedSpeciesId || undefined
+        });
 
-        if (error) {
-            toast.error('Erreur : ' + error.message);
+        if (!res.success) {
+            toast.error('Erreur lors du vote');
         } else {
-            // Re-fetch votes to check threshold
-            const { data: updatedVotes } = await supabase
-                .from('observation_votes')
-                .select('vote')
-                .eq('observation_id', observationId);
-
-            if (updatedVotes) {
-                const confirmsCount = (updatedVotes as unknown as { vote: string }[]).filter(v => v.vote === 'confirm').length;
-                const totalCount = updatedVotes.length;
-                const consensus = totalCount > 0 ? (confirmsCount / totalCount) * 100 : 0;
-
-                if (confirmsCount >= 3 && consensus >= 70) {
-                    await supabase
-                        .from('observations')
-                        .update({ is_verified: true })
-                        .eq('id', observationId);
-                    toast.success("Observation validée officiellement par la communauté ! ✅", { icon: '🌟' });
-                }
-            }
-
-            await addXP(user.id, XP_REWARDS.VOTE_CAST, 'Vote sur observation');
-            toast.success(`+5 XP 🎮 — Vote enregistré !`);
+            toast.success(`Vote enregistré !`);
             setUserVote(vote);
             setComment('');
-            fetchVotes();
+            fetchData();
+            if (onVoteSuccess) onVoteSuccess();
         }
     };
 
@@ -132,7 +103,6 @@ export function VotePanel({ observationId, compact = false, onVoteSuccess }: Vot
                 )}
             </h4>
 
-            {/* Barre de consensus */}
             <div className="relative h-4 rounded-full overflow-hidden bg-stone-100 mb-3">
                 <motion.div
                     className="absolute inset-y-0 left-0 bg-green-500 rounded-full"
@@ -155,7 +125,6 @@ export function VotePanel({ observationId, compact = false, onVoteSuccess }: Vot
                 <span className="text-stone-400 font-bold">❓ {unsures} incertains</span>
             </div>
 
-            {/* Boutons de vote */}
             {!userVote ? (
                 <div className="space-y-3">
                     <div className="flex gap-2">
@@ -208,7 +177,6 @@ export function VotePanel({ observationId, compact = false, onVoteSuccess }: Vot
                 </div>
             )}
 
-            {/* Liste des votes avec noms */}
             {votes.length > 0 && (
                 <div className="mt-4 pt-3 border-t border-stone-100">
                     <p className="text-[10px] font-bold text-stone-300 uppercase tracking-wider mb-2">Derniers votes</p>
@@ -216,7 +184,7 @@ export function VotePanel({ observationId, compact = false, onVoteSuccess }: Vot
                         {votes.slice(0, 5).map((v, i) => (
                             <div key={i} className="flex items-center gap-2 text-xs text-stone-400">
                                 <span>{v.vote === 'confirm' ? '✅' : v.vote === 'reject' ? '❌' : '❓'}</span>
-                                <span className="font-bold text-stone-600">{v.profiles?.[0]?.full_name || 'Anonyme'}</span>
+                                <span className="font-bold text-stone-600">{v.user?.name || 'Anonyme'}</span>
                                 {v.comment && <span className="text-stone-300">— {v.comment}</span>}
                             </div>
                         ))}

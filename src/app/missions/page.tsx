@@ -1,80 +1,65 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Target, Users, Calendar, Loader2, Trophy, MessageSquare, Send, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Image from 'next/image';
-
-interface Mission {
-  id: string;
-  title: string;
-  description: string;
-  target_count: number;
-  current_count: number;
-  image_url: string;
-  status: string;
-  end_date: string;
-}
-interface MissionMessage {
-  id: string;
-  content: string;
-  created_at: string;
-  profiles: {
-    full_name: string;
-    avatar_url: string | null;
-  } | null;
-}
+import { getActiveMissions, getMissionMessages, sendMissionMessage } from '@/lib/actions';
+import { useSession } from 'next-auth/react';
+import toast, { Toaster } from 'react-hot-toast';
 
 export default function MissionsPage() {
-  const [missions, setMissions] = useState<Mission[]>([]);
-  const [selectedMission, setSelectedMission] = useState<Mission | null>(null);
-  const [messages, setMessages] = useState<MissionMessage[]>([]);
+  const { data: session } = useSession();
+  const [missions, setMissions] = useState<any[]>([]);
+  const [selectedMission, setSelectedMission] = useState<any | null>(null);
+  const [messages, setMessages] = useState<any[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
 
-  const fetchMessages = async (missionId: string) => {
-    const { data } = await supabase
-      .from('mission_messages')
-      .select('*, profiles(full_name, avatar_url)')
-      .eq('mission_id', missionId)
-      .order('created_at', { ascending: true });
-    if (data) setMessages(data);
-  };
+  const fetchMessagesData = useCallback(async (missionId: string) => {
+    try {
+        const data = await getMissionMessages(missionId);
+        setMessages(data || []);
+    } catch (err) {
+        console.error(err);
+    }
+  }, []);
+
+  const fetchMissionsData = useCallback(async () => {
+    setLoading(true);
+    try {
+        const data = await getActiveMissions();
+        setMissions(data || []);
+    } catch (err) {
+        console.error(err);
+    } finally {
+        setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    async function fetchMissions() {
-      const { data } = await supabase
-        .from('missions')
-        .select('*')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
-      if (data) setMissions(data);
-      setLoading(false);
-    }
-    fetchMissions();
-  }, [supabase]);
+    fetchMissionsData();
+  }, [fetchMissionsData]);
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMessage.trim()) return;
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return alert("Connectez-vous pour discuter !");
+    if (!session) return toast.error("Connectez-vous pour discuter !");
 
-    await supabase.from('mission_messages').insert([{
-      mission_id: selectedMission?.id,
-      user_id: user.id,
-      content: newMessage
-    }]);
-    setNewMessage('');
-    fetchMessages(selectedMission!.id);
+    const res = await sendMissionMessage(selectedMission.id, newMessage);
+    if (res.success) {
+        setNewMessage('');
+        fetchMessagesData(selectedMission.id);
+    } else {
+        toast.error("Erreur lors de l'envoi");
+    }
   };
 
   if (loading) return <div className="flex justify-center py-24"><Loader2 className="animate-spin text-green-600 h-10 w-10" /></div>;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-12 bg-white min-h-screen">
+      <Toaster position="bottom-center" />
       <AnimatePresence>
         {selectedMission && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-stone-900/40 backdrop-blur-sm">
@@ -90,13 +75,15 @@ export default function MissionsPage() {
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
                 {messages.map((m) => (
                   <div key={m.id} className="flex gap-4">
-                    <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center overflow-hidden flex-shrink-0 border border-stone-200 relative">{m.profiles?.avatar_url ? <Image src={m.profiles.avatar_url} alt="Avatar" className="object-cover" fill /> : <Users className="h-5 w-5 text-stone-300" />}</div>
+                    <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center overflow-hidden flex-shrink-0 border border-stone-200 relative">
+                        {m.user?.image ? <Image src={m.user.image} alt="Avatar" className="object-cover" fill /> : <Users className="h-5 w-5 text-stone-300" />}
+                    </div>
                     <div className="flex-1">
                       <div className="bg-stone-50 p-4 rounded-2xl rounded-tl-none border border-stone-100">
-                        <p className="font-bold text-xs text-stone-900 mb-1">{m.profiles?.full_name}</p>
+                        <p className="font-bold text-xs text-stone-900 mb-1">{m.user?.name || 'Anonyme'}</p>
                         <p className="text-sm text-stone-600 leading-relaxed">{m.content}</p>
                       </div>
-                      <span className="text-[9px] font-bold text-stone-400 ml-2 mt-1 block uppercase">{new Date(m.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span className="text-[9px] font-bold text-stone-400 ml-2 mt-1 block uppercase">{new Date(m.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
                   </div>
                 ))}
@@ -122,7 +109,7 @@ export default function MissionsPage() {
       {missions.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
           {missions.map((mission) => {
-            const progress = (mission.current_count / mission.target_count) * 100;
+            const progress = (mission.currentCount / mission.targetCount) * 100;
             return (
               <motion.div
                 key={mission.id}
@@ -131,7 +118,7 @@ export default function MissionsPage() {
                 className="bg-white rounded-3xl border border-stone-100 shadow-xl overflow-hidden flex flex-col lg:flex-row h-full"
               >
                 <div className="lg:w-1/3 h-48 lg:h-auto relative bg-stone-100">
-                  <Image src={mission.image_url || 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=800&q=80'} className="object-cover" alt="Mission" fill />
+                  <Image src={mission.imageUrl || 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?auto=format&fit=crop&w=800&q=80'} className="object-cover" alt="Mission" fill />
                   <div className="absolute z-10 top-4 left-4 bg-green-600 text-white text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-widest">Actif</div>
                 </div>
 
@@ -143,7 +130,7 @@ export default function MissionsPage() {
                     <div className="space-y-4 mb-8">
                       <div className="flex justify-between text-xs font-bold text-stone-400 uppercase">
                         <span>Progression</span>
-                        <span className="text-green-600">{mission.current_count} / {mission.target_count} signalements</span>
+                        <span className="text-green-600">{mission.currentCount} / {mission.targetCount} signalements</span>
                       </div>
                       <div className="w-full h-3 bg-stone-100 rounded-full overflow-hidden border border-stone-50">
                         <motion.div
@@ -157,12 +144,12 @@ export default function MissionsPage() {
 
                   <div className="flex items-center justify-between pt-6 border-t border-stone-50">
                     <div className="flex items-center text-stone-400 text-xs font-medium">
-                      <Calendar className="h-4 w-4 mr-1" /> Expire le {new Date(mission.end_date).toLocaleDateString('fr-FR')}
+                      <Calendar className="h-4 w-4 mr-1" /> {mission.endDate ? `Expire le ${new Date(mission.endDate).toLocaleDateString('fr-FR')}` : 'Mission permanente'}
                     </div>
                     <button
                       onClick={() => {
                         setSelectedMission(mission);
-                        fetchMessages(mission.id);
+                        fetchMessagesData(mission.id);
                       }}
                       className="bg-stone-900 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-green-600 transition-all flex items-center shadow-lg shadow-stone-900/10"
                     >

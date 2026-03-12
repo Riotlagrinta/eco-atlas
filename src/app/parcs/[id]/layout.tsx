@@ -1,9 +1,7 @@
 import { Metadata } from 'next';
-import { createClient } from '@supabase/supabase-js';
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+import { db } from '@/lib/db';
+import { protectedAreas } from '@/lib/db/schema';
+import { eq } from 'drizzle-orm';
 
 type Props = {
     params: Promise<{ id: string }>;
@@ -14,11 +12,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     const id = resolvedParams.id;
 
     try {
-        const { data: parc } = await supabase
-            .from('protected_areas')
-            .select('name, description, image_url, surface_area, type')
-            .eq('id', id)
-            .single();
+        const parc = await db.query.protectedAreas.findFirst({
+            where: eq(protectedAreas.id, id)
+        });
 
         if (!parc) {
             return {
@@ -27,10 +23,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
             };
         }
 
-        const title = `${parc.name} (${parc.type}) | Eco-Atlas Togo`;
+        const title = `${parc.name} (${parc.type || 'Zone protégée'}) | Eco-Atlas Togo`;
         const description = parc.description
             ? parc.description.substring(0, 160) + '...'
-            : `Explorez la riche faune et flore sauvage de ${parc.name}, couvrant plus de ${parc.surface_area || 'milliers de'} km².`;
+            : `Explorez la riche faune et flore sauvage de ${parc.name}, couvrant une vaste superficie au Togo.`;
 
         return {
             title,
@@ -43,7 +39,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
                 siteName: 'Eco-Atlas',
                 images: [
                     {
-                        url: parc.image_url || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80',
+                        url: parc.imageUrl || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80',
                         width: 1200,
                         height: 630,
                         alt: parc.name,
@@ -54,7 +50,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
                 card: 'summary_large_image',
                 title,
                 description,
-                images: [parc.image_url || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80'],
+                images: [parc.imageUrl || 'https://images.unsplash.com/photo-1542601906990-b4d3fb778b09?ixlib=rb-4.0.3&auto=format&fit=crop&w=1200&q=80'],
             },
         };
     } catch (error) {

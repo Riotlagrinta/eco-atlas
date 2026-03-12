@@ -1,17 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { db } from '@/lib/db';
+import { observations, apiKeys, apiLogs, species } from '@/lib/db/schema';
+import { eq, and, ilike, gte, desc, sql } from 'drizzle-orm';
 
 export const dynamic = 'force-dynamic';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-
 export async function GET(req: NextRequest) {
-  if (!supabaseUrl || !supabaseServiceKey) {
-    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
-  }
-
-  const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
   const apiKey = req.headers.get('x-api-key');
 
   if (!apiKey) {
@@ -19,65 +13,71 @@ export async function GET(req: NextRequest) {
   }
 
   // Vérifier la validité de la clé API
-  const { data: keyData, error: keyError } = await supabaseAdmin
-    .from('api_keys')
-    .select('*')
-    .eq('api_key', apiKey)
-    .eq('is_active', true)
-    .single();
+  const keyData = await db.query.apiKeys.findFirst({
+    where: and(eq(apiKeys.key, apiKey), eq(apiKeys.isActive, true)),
+  });
 
-  if (keyError || !keyData) {
+  if (!keyData) {
     return NextResponse.json({ error: 'Invalid or inactive API key' }, { status: 403 });
   }
 
-  // Log de la requête
-  await supabaseAdmin.from('api_logs').insert({
-    api_key_id: keyData.id,
+  // Log de la requête (optionnel mais recommandé)
+  await db.insert(apiLogs).values({
+    apiKeyId: keyData.id,
     endpoint: '/api/v1/observations',
     method: 'GET',
-    response_code: 200
+    responseCode: 200,
   });
 
   const { searchParams } = new URL(req.url);
-  const species = searchParams.get('species');
-  const region = searchParams.get('region');
+  const speciesName = searchParams.get('species');
   const dateFrom = searchParams.get('date_from');
 
-  let query = supabaseAdmin
-    .from('observations')
-    .select('id, description, image_url, location, is_verified, created_at, species:species_id(name, scientific_name)')
-    .eq('is_verified', true);
-
-  if (species) {
-    query = query.ilike('species.name', `%${species}%`);
-  }
-  
-  // Note: La région est souvent stockée dans le profil de l'utilisateur qui a fait l'observation
-  // On peut filtrer par région via une jointure si nécessaire, ici on fait simple
-  if (dateFrom) {
-    query = query.gte('created_at', dateFrom);
-  }
-
-  const { data, error } = await query.order('created_at', { ascending: false }).limit(100);
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  // Transformer les points PostGIS en GeoJSON si nécessaire
-  const formattedData = data.map(obs => {
-    // Si location est une chaîne POINT(lng lat)
-    const match = obs.location?.match(/POINT\(([-\d.]+) ([-\d.]+)\)/);
-    const coordinates = match ? [parseFloat(match[1]), parseFloat(match[2])] : null;
-
-    return {
-      ...obs,
-      geometry: coordinates ? {
-        type: 'Point',
-        coordinates: coordinates
-      } : null
-    };
+  // Construction de la requête avec Drizzle
+  const results = await db.query.observations.findMany({
+    where: (obs, { and, eq, gte, ilike }) => {
+      const conditions = [eq(obs.isVerified, true)];
+      if (dateFrom) conditions.push(gte(obs.createdAt, new Date(dateFrom)));
+      return and(...conditions);
+    },
+    with: {
+      species: true,
+      user: {
+        columns: {
+          name: true,
+          image: true,
+        }
+      }
+    },
+    orderBy: [desc(observations.createdAt)],
+    limit: 100,
   });
+
+  // Filtrage manuel pour l'espèce (si jointe) ou via query builder plus complexe
+  let filteredResults = results;
+  if (speciesName) {
+    filteredResults = results.filter(r => 
+      r.species?.name.toLowerCase().includes(speciesName.toLowerCase()) || 
+      r.species?.scientificName?.toLowerCase().includes(speciesName.toLowerCase())
+    );
+  }
+
+  // Transformer les données pour le format GeoJSON attendu
+  const formattedData = filteredResults.map(obs => ({
+    id: obs.id,
+    description: obs.description,
+    image_url: obs.imageUrl,
+    is_verified: obs.isVerified,
+    created_at: obs.createdAt,
+    species: obs.species ? {
+      name: obs.species.name,
+      scientific_name: obs.species.scientificName
+    } : null,
+    geometry: (obs.latitude && obs.longitude) ? {
+      type: 'Point',
+      coordinates: [obs.longitude, obs.latitude]
+    } : null
+  }));
 
   return NextResponse.json({
     success: true,

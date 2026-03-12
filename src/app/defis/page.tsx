@@ -2,58 +2,36 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { getActiveChallenges, getUserChallenges } from '@/lib/gamification';
-import { createClient } from '@/lib/supabase/client';
 import { Target, Clock, Zap, Loader2, CheckCircle, Gift } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
-
-interface Challenge {
-    id: string;
-    title: string;
-    description: string;
-    xp_reward: number;
-    target_type: string;
-    target_count: number;
-    start_date: string;
-    end_date: string;
-    image_url: string;
-    is_active: boolean;
-}
-
-interface UserChallenge {
-    challenge_id: string;
-    progress: number;
-    completed: boolean;
-    completed_at: string | null;
-    challenges: Challenge;
-}
+import { useSession } from 'next-auth/react';
 
 export default function DefisPage() {
-    const [challenges, setChallenges] = useState<Challenge[]>([]);
-    const [userProgress, setUserProgress] = useState<UserChallenge[]>([]);
+    const [challenges, setChallenges] = useState<any[]>([]);
+    const [userProgress, setUserProgress] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
-    const supabase = createClient();
+    const { data: session } = useSession();
 
     const fetchData = useCallback(async () => {
         setLoading(true);
-        const { data: { user } } = await supabase.auth.getUser();
-
+        
         const activeChallenges = await getActiveChallenges();
-        setChallenges(activeChallenges as Challenge[]);
+        setChallenges(activeChallenges);
 
-        if (user) {
-            const progress = await getUserChallenges(user.id);
-            setUserProgress(progress as UserChallenge[]);
+        if (session?.user?.id) {
+            const progress = await getUserChallenges(session.user.id);
+            setUserProgress(progress);
         }
         setLoading(false);
-    }, [supabase]);
+    }, [session]);
 
     useEffect(() => {
         fetchData();
     }, [fetchData]);
 
     const getProgressForChallenge = (challengeId: string) => {
-        return userProgress.find(p => p.challenge_id === challengeId);
+        return userProgress.find(p => p.challengeId === challengeId);
     };
 
     const getTimeRemaining = (endDate: string) => {
@@ -101,7 +79,7 @@ export default function DefisPage() {
                     {challenges.map((challenge, index) => {
                         const progress = getProgressForChallenge(challenge.id);
                         const progressPercent = progress
-                            ? Math.min(100, (progress.progress / challenge.target_count) * 100)
+                            ? Math.min(100, (progress.progress / challenge.targetCount) * 100)
                             : 0;
                         const isCompleted = progress?.completed || false;
 
@@ -117,10 +95,10 @@ export default function DefisPage() {
                                     }`}
                             >
                                 {/* Image en-tête */}
-                                {challenge.image_url && (
+                                {challenge.imageUrl && (
                                     <div className="relative h-32 w-full">
                                         <Image
-                                            src={challenge.image_url}
+                                            src={challenge.imageUrl}
                                             alt={challenge.title}
                                             fill
                                             className="object-cover"
@@ -133,7 +111,7 @@ export default function DefisPage() {
                                 )}
 
                                 <div className="p-5">
-                                    {!challenge.image_url && (
+                                    {!challenge.imageUrl && (
                                         <h3 className="font-black text-stone-900 text-lg mb-1">{challenge.title}</h3>
                                     )}
                                     <p className="text-sm text-stone-500 mb-4">{challenge.description}</p>
@@ -141,13 +119,13 @@ export default function DefisPage() {
                                     {/* Infos */}
                                     <div className="flex flex-wrap gap-3 mb-4">
                                         <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-50 text-purple-700 rounded-xl text-xs font-bold">
-                                            <Zap className="h-3 w-3" /> +{challenge.xp_reward} XP
+                                            <Zap className="h-3 w-3" /> +{challenge.xpReward} XP
                                         </span>
                                         <span className="inline-flex items-center gap-1 px-3 py-1 bg-stone-100 text-stone-600 rounded-xl text-xs font-bold">
-                                            {getTypeLabel(challenge.target_type)}
+                                            {getTypeLabel(challenge.targetType)}
                                         </span>
                                         <span className="inline-flex items-center gap-1 px-3 py-1 bg-orange-50 text-orange-600 rounded-xl text-xs font-bold">
-                                            <Clock className="h-3 w-3" /> {getTimeRemaining(challenge.end_date)}
+                                            <Clock className="h-3 w-3" /> {getTimeRemaining(challenge.endDate)}
                                         </span>
                                     </div>
 
@@ -155,7 +133,7 @@ export default function DefisPage() {
                                     <div className="relative">
                                         <div className="flex justify-between text-xs mb-1">
                                             <span className="font-bold text-stone-600">
-                                                {progress?.progress || 0} / {challenge.target_count}
+                                                {progress?.progress || 0} / {challenge.targetCount}
                                             </span>
                                             {isCompleted && (
                                                 <span className="text-green-600 font-bold flex items-center gap-1">
@@ -180,7 +158,7 @@ export default function DefisPage() {
                                             animate={{ opacity: 1 }}
                                         >
                                             <Gift className="h-4 w-4" />
-                                            <span className="text-sm font-bold">+{challenge.xp_reward} XP récoltés !</span>
+                                            <span className="text-sm font-bold">+{challenge.xpReward} XP récoltés !</span>
                                         </motion.div>
                                     )}
                                 </div>
