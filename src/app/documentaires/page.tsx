@@ -6,6 +6,8 @@ import { motion } from 'framer-motion';
 import Image from 'next/image';
 import { getAllDocumentaries } from '@/lib/actions';
 
+export const dynamic = "force-dynamic";
+
 export default function DocumentairesPage() {
   const [docs, setDocs] = useState<any[]>([]);
   const [selectedDoc, setSelectedDoc] = useState<any | null>(null);

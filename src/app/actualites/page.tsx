@@ -7,6 +7,8 @@ import Image from 'next/image';
 import { getAllArticles, getComments, addComment } from '@/lib/actions';
 import { useSession } from 'next-auth/react';
 
+export const dynamic = "force-dynamic";
+
 interface Article {
   id: string;
   title: string;

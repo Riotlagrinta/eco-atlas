@@ -8,6 +8,8 @@ import { getActiveMissions, getMissionMessages, sendMissionMessage } from '@/lib
 import { useSession } from 'next-auth/react';
 import toast, { Toaster } from 'react-hot-toast';
 
+export const dynamic = "force-dynamic";
+
 export default function MissionsPage() {
   const { data: session } = useSession();
   const [missions, setMissions] = useState<any[]>([]);

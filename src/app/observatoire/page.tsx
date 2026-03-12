@@ -10,6 +10,8 @@ import Image from 'next/image';
 import { useSession } from 'next-auth/react';
 import { getAllSpecies, getSpeciesComments, addSpeciesComment, getFavorites, toggleFavorite as toggleFavAction } from '@/lib/actions';
 
+export const dynamic = "force-dynamic";
+
 const MiniMap = dynamic(() => import('@/components/Map'), {
   ssr: false,
   loading: () => <div className="h-full bg-stone-100 animate-pulse" />

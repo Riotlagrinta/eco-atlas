@@ -12,6 +12,8 @@ import { getTrailById, getAllGuides } from '@/lib/actions';
 
 import { DynamicTrailMap } from '@/components/DynamicTrailMap';
 
+export const dynamic = "force-dynamic";
+
 export default async function TrailDetailPage({ params }: { params: { id: string } }) {
   const { id } = await params;
   const trail = await getTrailById(id);

@@ -10,6 +10,8 @@ import { motion } from 'framer-motion';
 import Image from 'next/image';
 import Link from 'next/link';
 
+export const dynamic = "force-dynamic";
+
 const difficultyLabels: Record<string, { label: string, color: string }> = {
   easy: { label: 'Facile', color: 'text-green-600 bg-green-50' },
   moderate: { label: 'Modéré', color: 'text-amber-600 bg-amber-50' },

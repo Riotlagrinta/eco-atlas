@@ -4,6 +4,8 @@ import { Trees, ArrowRight, Maximize } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 
+export const dynamic = "force-dynamic";
+
 export default async function ParcsPage() {
   const areas = await getAllProtectedAreas();
 

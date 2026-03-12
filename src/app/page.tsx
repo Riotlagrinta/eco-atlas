@@ -6,6 +6,8 @@ import { translations } from '@/lib/i18n';
 import Image from 'next/image';
 import { getLatestArticles, getLatestVerifiedObservations } from '@/lib/actions';
 
+export const dynamic = "force-dynamic";
+
 // We'll use a wrapper component for language if needed, 
 // or for now keep it simple as a Server Component.
 // Since the original used a button to change lang, 

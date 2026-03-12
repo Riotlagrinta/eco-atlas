@@ -3,6 +3,8 @@ import { db } from '@/lib/db';
 import { pushSubscriptions, notificationPreferences } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 
+export const dynamic = "force-dynamic";
+
 export async function POST(req: NextRequest) {
     try {
         const { userId, endpoint, p256dh, auth } = await req.json() as {

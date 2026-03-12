@@ -4,6 +4,8 @@ import { MapPin, ArrowLeft, Activity, Leaf, Sun, Cloud } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
 
+export const dynamic = "force-dynamic";
+
 export default async function ParcDetail({ params }: { params: { id: string } }) {
   const { id } = params;
   const parc = await getProtectedAreaById(id);

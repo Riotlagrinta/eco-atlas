@@ -9,6 +9,8 @@ import toast, { Toaster } from 'react-hot-toast';
 import { getForumThreads, createForumThread } from '@/lib/actions';
 import { useSession } from 'next-auth/react';
 
+export const dynamic = "force-dynamic";
+
 const CATEGORIES = [
     { key: 'all', label: 'Tous', icon: MessageSquare },
     { key: 'general', label: 'Général', icon: MessageCircle },

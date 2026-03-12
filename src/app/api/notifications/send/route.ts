@@ -4,6 +4,8 @@ import { db } from '@/lib/db';
 import { notifications, pushSubscriptions, notificationPreferences } from '@/lib/db/schema';
 import { eq, and } from 'drizzle-orm';
 
+export const dynamic = "force-dynamic";
+
 // Initialisation lazy de VAPID
 let vapidInitialized = false;
 function initVapid() {

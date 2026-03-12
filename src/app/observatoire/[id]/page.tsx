@@ -10,6 +10,8 @@ import { revalidatePath } from 'next/cache';
 
 import { DynamicMap } from '@/components/DynamicMap';
 
+export const dynamic = "force-dynamic";
+
 const statusColors: Record<string, string> = {
   'CR': 'bg-red-600', 'EN': 'bg-orange-600', 'VU': 'bg-yellow-500', 'NT': 'bg-blue-500', 'LC': 'bg-green-500',
 };

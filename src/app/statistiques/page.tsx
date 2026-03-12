@@ -3,6 +3,8 @@ import { getStatistics } from '@/lib/actions';
 import { BarChart3, PieChart, Activity, ShieldCheck, Leaf, Users, ArrowUpRight, Trophy, Globe } from 'lucide-react';
 import StatistiquesClient from './StatistiquesClient';
 
+export const dynamic = "force-dynamic";
+
 export default async function StatistiquesPage() {
   const stats = await getStatistics();
 

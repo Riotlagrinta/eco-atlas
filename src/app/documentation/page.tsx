@@ -3,6 +3,8 @@ import { FileText, Download, Gavel, BookOpen } from 'lucide-react';
 import * as motion from 'framer-motion/client';
 import { getAllDocuments } from '@/lib/actions';
 
+export const dynamic = "force-dynamic";
+
 export default async function DocumentationPage() {
   const docs = await getAllDocuments();
 
