@@ -1,7 +1,6 @@
 import React from 'react';
 import { getSpeciesById, addSpeciesComment } from '@/lib/actions';
 import { MapPin, ArrowLeft, Share2, MessageSquare, Send, User, Camera, Clock, CheckCircle } from 'lucide-react';
-import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import Image from 'next/image';
 import { VotePanel } from '@/components/VotePanel';

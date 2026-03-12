@@ -4,7 +4,7 @@ import {
   CheckCircle, ShieldCheck, Languages, Phone, 
   Mountain, Compass
 } from 'lucide-react';
-import dynamic from 'next/dynamic';
+import nextDynamic from 'next/dynamic';
 import Link from 'next/link';
 import Image from 'next/image';
 import { BookingForm } from '@/components/BookingForm';
@@ -21,6 +21,11 @@ export default async function TrailDetailPage({ params }: { params: { id: string
   const guide = guides[0]; // Simplified for now
 
   if (!trail) return <div className="text-center py-24 text-stone-400 font-bold">Circuit introuvable.</div>;
+
+  const TrailMap = nextDynamic(() => import('@/components/TrailMap'), {
+    ssr: false,
+    loading: () => <div className="h-full bg-stone-100 animate-pulse" />
+  });
 
   return (
     <div className="min-h-screen bg-stone-50/30">

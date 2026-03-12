@@ -3,7 +3,7 @@
 import React, { useEffect, useState, Suspense, useCallback } from 'react';
 import { Leaf, Search, Loader2, X, Share2, Heart, MessageSquare, Send, User, MapPin, Trees } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import dynamic from 'next/dynamic';
+import nextDynamic from 'next/dynamic';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -12,7 +12,7 @@ import { getAllSpecies, getSpeciesComments, addSpeciesComment, getFavorites, tog
 
 export const dynamic = "force-dynamic";
 
-const MiniMap = dynamic(() => import('@/components/Map'), {
+const MiniMap = nextDynamic(() => import('@/components/Map'), {
   ssr: false,
   loading: () => <div className="h-full bg-stone-100 animate-pulse" />
 });
